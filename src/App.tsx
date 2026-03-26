@@ -6,6 +6,7 @@ import Scorecard from "./components/Scorecard";
 import Todos from "./components/pages/Todos";
 import Issues from "./components/pages/Issues";
 import Headlines from "./components/pages/Headlines";
+import Login from "./components/Login";
 
 type NavItem = "overview" | "scorecard" | "todos" | "issues" | "headlines";
 
@@ -27,6 +28,10 @@ function AppShell() {
 }
 
 export default function App() {
+  const [authed, setAuthed] = useState(() => localStorage.getItem("ninety-auth") === "1");
+
+  if (!authed) return <Login onLogin={() => setAuthed(true)} />;
+
   return (
     <AppProvider>
       <AppShell />
