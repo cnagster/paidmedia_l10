@@ -6,9 +6,10 @@ import Scorecard from "./components/Scorecard";
 import Todos from "./components/pages/Todos";
 import Issues from "./components/pages/Issues";
 import Headlines from "./components/pages/Headlines";
+import OKRs from "./components/pages/OKRs";
 import Login from "./components/Login";
 
-type NavItem = "overview" | "scorecard" | "todos" | "issues" | "headlines";
+type NavItem = "overview" | "scorecard" | "okrs" | "todos" | "issues" | "headlines";
 
 function AppShell() {
   const [activeNav, setActiveNav] = useState<NavItem>("overview");
@@ -22,6 +23,7 @@ function AppShell() {
         {activeNav === "todos"     && <Todos />}
         {activeNav === "issues"    && <Issues />}
         {activeNav === "headlines" && <Headlines />}
+        {activeNav === "okrs"      && <OKRs />}
       </main>
     </div>
   );

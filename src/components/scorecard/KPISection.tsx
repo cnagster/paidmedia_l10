@@ -69,6 +69,7 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
   const [editingGoal, setEditingGoal] = useState<string | null>(null); // kpiId
   const [tempGoalOp, setTempGoalOp] = useState<GoalOperator>(">=");
   const [tempGoalVal, setTempGoalVal] = useState("");
+  const [tempValueType, setTempValueType] = useState<ValueType>("number");
   const [editingCell, setEditingCell] = useState<{ kpiId: string; weekKey: string } | null>(null);
   const [tempValue, setTempValue] = useState("");
 
@@ -86,24 +87,16 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
 
   function addKPI() {
     const title = prompt("KPI title:");
-    if (!title) return;
-    const goalStr = prompt('Goal — enter operator and value\n(e.g. ">= 750000"  or  ">= 10" for a percentage)');
-    if (!goalStr) return;
-    const match = goalStr.trim().match(/^(>=|<=|>|<|=)\s*([\d.]+)/);
-    if (!match) { alert("Couldn't parse goal. Try: >= 750000"); return; }
-    const typeStr = prompt('Value type:\n  1 – currency (default)\n  2 – percentage\n  3 – number');
-    const typeMap: Record<string, ValueType> = { "2": "percentage", "3": "number" };
-    const valueType: ValueType = typeMap[typeStr ?? ""] ?? "currency";
-
+    if (!title?.trim()) return;
     push({
       kpis: [
         ...section.kpis,
         {
           id: Date.now().toString(),
-          title,
-          goalOperator: match[1] as GoalOperator,
-          goalValue: parseFloat(match[2]),
-          valueType,
+          title: title.trim(),
+          goalOperator: ">=",
+          goalValue: 0,
+          valueType: "number",
           weeklyValues: {},
         },
       ],
@@ -113,12 +106,14 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
   function openGoalEdit(kpi: KPI) {
     setEditingGoal(kpi.id);
     setTempGoalOp(kpi.goalOperator);
-    setTempGoalVal(String(kpi.goalValue));
+    setTempGoalVal(kpi.goalValue === 0 ? "" : String(kpi.goalValue));
+    setTempValueType(kpi.valueType);
   }
 
   function commitGoal(id: string) {
     const num = parseFloat(tempGoalVal.replace(/[$,%\s]/g, ""));
-    if (!isNaN(num)) updateKPI(id, { goalOperator: tempGoalOp, goalValue: num });
+    if (!isNaN(num)) updateKPI(id, { goalOperator: tempGoalOp, goalValue: num, valueType: tempValueType });
+    else if (tempGoalVal.trim() === "") updateKPI(id, { goalOperator: tempGoalOp, valueType: tempValueType });
     setEditingGoal(null);
   }
 
@@ -128,11 +123,26 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
   }
 
   function commitCell(kpiId: string, weekKey: string) {
-    const num = parseFloat(tempValue.replace(/[$,%\s]/g, ""));
-    if (!isNaN(num)) {
-      const kpi = section.kpis.find((k) => k.id === kpiId)!;
-      updateKPI(kpiId, { weeklyValues: { ...kpi.weeklyValues, [weekKey]: num } });
+    const kpi = section.kpis.find((k) => k.id === kpiId)!;
+    if (tempValue.trim() === "") {
+      // Clear the cell — remove the key so it's excluded from average
+      const next = { ...kpi.weeklyValues };
+      delete next[weekKey];
+      updateKPI(kpiId, { weeklyValues: next });
+    } else {
+      const num = parseFloat(tempValue.replace(/[$,%\s]/g, ""));
+      if (!isNaN(num)) {
+        updateKPI(kpiId, { weeklyValues: { ...kpi.weeklyValues, [weekKey]: num } });
+      }
     }
+    setEditingCell(null);
+  }
+
+  function clearCell(kpiId: string, weekKey: string) {
+    const kpi = section.kpis.find((k) => k.id === kpiId)!;
+    const next = { ...kpi.weeklyValues };
+    delete next[weekKey];
+    updateKPI(kpiId, { weeklyValues: next });
     setEditingCell(null);
   }
 
@@ -338,29 +348,46 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
                         title="Click to edit goal"
                       >
                         {editingGoal === kpi.id ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                              {/* Operator */}
+                              <select
+                                autoFocus
+                                value={tempGoalOp}
+                                onChange={(e) => setTempGoalOp(e.target.value as GoalOperator)}
+                                onKeyDown={(e) => { if (e.key === "Escape") setEditingGoal(null); }}
+                                style={{ border: "1px solid #5b9ea6", borderRadius: 3, fontSize: 12, padding: "2px 3px", outline: "none", background: "#fff" }}
+                              >
+                                {([">=", "<=", ">", "<", "="] as GoalOperator[]).map((op) => (
+                                  <option key={op} value={op}>{op}</option>
+                                ))}
+                              </select>
+                              {/* Value */}
+                              <input
+                                value={tempGoalVal}
+                                onChange={(e) => setTempGoalVal(e.target.value)}
+                                onBlur={() => commitGoal(kpi.id)}
+                                onKeyDown={(e) => { if (e.key === "Enter") commitGoal(kpi.id); if (e.key === "Escape") setEditingGoal(null); }}
+                                placeholder="value"
+                                style={{ width: 72, border: "1px solid #5b9ea6", borderRadius: 3, padding: "2px 4px", fontSize: 13, outline: "none" }}
+                              />
+                            </div>
+                            {/* Value type */}
                             <select
-                              autoFocus
-                              value={tempGoalOp}
-                              onChange={(e) => setTempGoalOp(e.target.value as GoalOperator)}
-                              onKeyDown={(e) => { if (e.key === "Enter") commitGoal(kpi.id); if (e.key === "Escape") setEditingGoal(null); }}
-                              style={{ border: "1px solid #5b9ea6", borderRadius: 3, fontSize: 12, padding: "1px 2px", outline: "none", background: "#fff" }}
+                              value={tempValueType}
+                              onChange={(e) => setTempValueType(e.target.value as ValueType)}
+                              onKeyDown={(e) => { if (e.key === "Escape") setEditingGoal(null); }}
+                              style={{ border: "1px solid #c8d0d8", borderRadius: 3, fontSize: 11, padding: "2px 3px", outline: "none", background: "#fff", color: "#555" }}
                             >
-                              {([">=", "<=", ">", "<", "="] as GoalOperator[]).map((op) => (
-                                <option key={op} value={op}>{op}</option>
-                              ))}
+                              <option value="number">Number</option>
+                              <option value="currency">Currency ($)</option>
+                              <option value="percentage">Percentage (%)</option>
                             </select>
-                            <input
-                              value={tempGoalVal}
-                              onChange={(e) => setTempGoalVal(e.target.value)}
-                              onBlur={() => commitGoal(kpi.id)}
-                              onKeyDown={(e) => { if (e.key === "Enter") commitGoal(kpi.id); if (e.key === "Escape") setEditingGoal(null); }}
-                              placeholder="value"
-                              style={{ width: 80, border: "1px solid #5b9ea6", borderRadius: 3, padding: "1px 4px", fontSize: 13, outline: "none" }}
-                            />
                           </div>
                         ) : (
-                          formatGoal(kpi.goalOperator, kpi.goalValue, kpi.valueType)
+                          kpi.goalValue === 0 && kpi.valueType === "number"
+                            ? <span style={{ color: "#bbb", fontSize: 12 }}>Set goal…</span>
+                            : formatGoal(kpi.goalOperator, kpi.goalValue, kpi.valueType)
                         )}
                       </td>
 
@@ -387,25 +414,32 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
                             }}
                           >
                             {isEditing ? (
-                              <input
-                                autoFocus
-                                value={tempValue}
-                                onChange={(e) => setTempValue(e.target.value)}
-                                onBlur={() => commitCell(kpi.id, w.key)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") commitCell(kpi.id, w.key);
-                                  if (e.key === "Escape") setEditingCell(null);
-                                }}
-                                style={{
-                                  width: 100,
-                                  textAlign: "right",
-                                  border: "1px solid #5b9ea6",
-                                  borderRadius: 3,
-                                  padding: "1px 4px",
-                                  fontSize: 13,
-                                  outline: "none",
-                                }}
-                              />
+                              <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                                <input
+                                  autoFocus
+                                  value={tempValue}
+                                  onChange={(e) => setTempValue(e.target.value)}
+                                  onBlur={() => commitCell(kpi.id, w.key)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") commitCell(kpi.id, w.key);
+                                    if (e.key === "Escape") setEditingCell(null);
+                                  }}
+                                  style={{
+                                    width: 80,
+                                    textAlign: "right",
+                                    border: "1px solid #5b9ea6",
+                                    borderRadius: 3,
+                                    padding: "1px 4px",
+                                    fontSize: 13,
+                                    outline: "none",
+                                  }}
+                                />
+                                <button
+                                  onMouseDown={(e) => { e.preventDefault(); clearCell(kpi.id, w.key); }}
+                                  title="Clear cell"
+                                  style={{ background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: 14, lineHeight: 1, padding: "0 2px", flexShrink: 0 }}
+                                >×</button>
+                              </div>
                             ) : (
                               <span style={{ opacity: val == null ? 0.35 : 1 }}>
                                 {val != null ? formatValue(val, kpi.valueType) : "—"}

@@ -1,4 +1,4 @@
-type NavItem = "overview" | "scorecard" | "todos" | "issues" | "headlines";
+type NavItem = "overview" | "scorecard" | "okrs" | "todos" | "issues" | "headlines";
 
 interface Props {
   activeNav: NavItem;
@@ -11,6 +11,7 @@ const navItems: { id: NavItem; label: string; icon: string }[] = [
   { id: "headlines", label: "Headlines", icon: "◻" },
   { id: "todos",     label: "To-Dos",    icon: "☑" },
   { id: "issues",    label: "Issues",    icon: "⚑" },
+  { id: "okrs",      label: "OKRs",      icon: "◇" },
 ];
 
 export default function Sidebar({ activeNav, onNavChange }: Props) {
