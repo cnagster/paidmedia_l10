@@ -87,3 +87,30 @@ export function getAverage(kpi: KPI, weeks: WeekRange[]): number | null {
   if (!vals.length) return null;
   return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
+
+// Evaluates a formula like "[Comforter Spend] / [Spend] * 100"
+// for a specific week, substituting values from sibling KPIs.
+// Returns null if any referenced KPI has no value for that week.
+export function evaluateFormula(
+  formula: string,
+  weekKey: string,
+  allKPIs: KPI[]
+): number | null {
+  try {
+    let expr = formula;
+    const refs = formula.match(/\[([^\]]+)\]/g) ?? [];
+    for (const ref of refs) {
+      const title = ref.slice(1, -1);
+      const kpi = allKPIs.find((k) => k.title === title);
+      if (!kpi) return null;
+      const val = kpi.weeklyValues[weekKey];
+      if (val == null) return null;
+      expr = expr.replace(ref, String(val));
+    }
+    // eslint-disable-next-line no-new-func
+    const result = new Function("return (" + expr + ")")() as number;
+    return isFinite(result) ? result : null;
+  } catch {
+    return null;
+  }
+}

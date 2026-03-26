@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import type { KPI, KPISection as KPISectionType, WeekRange, GoalOperator, ValueType } from "./types";
-import { formatValue, formatGoal, meetsGoal, getTrend, getAverage } from "./utils";
+import { formatValue, formatGoal, meetsGoal, getTrend, getAverage, evaluateFormula } from "./utils";
 import ContextMenu from "./ContextMenu";
 import CreateItemModal from "./CreateItemModal";
 import type { ItemType } from "./CreateItemModal";
@@ -70,6 +70,8 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
   const [tempGoalOp, setTempGoalOp] = useState<GoalOperator>(">=");
   const [tempGoalVal, setTempGoalVal] = useState("");
   const [tempValueType, setTempValueType] = useState<ValueType>("number");
+  const [goalMode, setGoalMode] = useState<"manual" | "formula">("manual");
+  const [tempFormula, setTempFormula] = useState("");
   const [editingCell, setEditingCell] = useState<{ kpiId: string; weekKey: string } | null>(null);
   const [tempValue, setTempValue] = useState("");
 
@@ -108,12 +110,18 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
     setTempGoalOp(kpi.goalOperator);
     setTempGoalVal(kpi.goalValue === 0 ? "" : String(kpi.goalValue));
     setTempValueType(kpi.valueType);
+    setGoalMode(kpi.formula ? "formula" : "manual");
+    setTempFormula(kpi.formula ?? "");
   }
 
   function commitGoal(id: string) {
-    const num = parseFloat(tempGoalVal.replace(/[$,%\s]/g, ""));
-    if (!isNaN(num)) updateKPI(id, { goalOperator: tempGoalOp, goalValue: num, valueType: tempValueType });
-    else if (tempGoalVal.trim() === "") updateKPI(id, { goalOperator: tempGoalOp, valueType: tempValueType });
+    if (goalMode === "formula") {
+      updateKPI(id, { formula: tempFormula.trim() || undefined, valueType: tempValueType });
+    } else {
+      const num = parseFloat(tempGoalVal.replace(/[$,%\s]/g, ""));
+      if (!isNaN(num)) updateKPI(id, { goalOperator: tempGoalOp, goalValue: num, valueType: tempValueType, formula: undefined });
+      else if (tempGoalVal.trim() === "") updateKPI(id, { goalOperator: tempGoalOp, valueType: tempValueType, formula: undefined });
+    }
     setEditingGoal(null);
   }
 
@@ -271,8 +279,17 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
 
               <tbody>
                 {section.kpis.map((kpi) => {
-                  const trend = getTrend(kpi, weeks);
-                  const avg = getAverage(kpi, weeks);
+                  // For formula KPIs, compute values per week dynamically
+                  const resolvedKPI = kpi.formula
+                    ? {
+                        ...kpi,
+                        weeklyValues: Object.fromEntries(
+                          weeks.map((w) => [w.key, evaluateFormula(kpi.formula!, w.key, section.kpis)])
+                        ),
+                      }
+                    : kpi;
+                  const trend = getTrend(resolvedKPI, weeks);
+                  const avg = getAverage(resolvedKPI, weeks);
                   const ti = TREND_STYLE[trend];
 
                   return (
@@ -348,66 +365,114 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
                         title="Click to edit goal"
                       >
                         {editingGoal === kpi.id ? (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                              {/* Operator */}
-                              <select
-                                autoFocus
-                                value={tempGoalOp}
-                                onChange={(e) => setTempGoalOp(e.target.value as GoalOperator)}
-                                onKeyDown={(e) => { if (e.key === "Escape") setEditingGoal(null); }}
-                                style={{ border: "1px solid #5b9ea6", borderRadius: 3, fontSize: 12, padding: "2px 3px", outline: "none", background: "#fff" }}
-                              >
-                                {([">=", "<=", ">", "<", "="] as GoalOperator[]).map((op) => (
-                                  <option key={op} value={op}>{op}</option>
-                                ))}
-                              </select>
-                              {/* Value */}
-                              <input
-                                value={tempGoalVal}
-                                onChange={(e) => setTempGoalVal(e.target.value)}
-                                onBlur={() => commitGoal(kpi.id)}
-                                onKeyDown={(e) => { if (e.key === "Enter") commitGoal(kpi.id); if (e.key === "Escape") setEditingGoal(null); }}
-                                placeholder="value"
-                                style={{ width: 72, border: "1px solid #5b9ea6", borderRadius: 3, padding: "2px 4px", fontSize: 13, outline: "none" }}
-                              />
+                          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                            {/* Mode toggle */}
+                            <div style={{ display: "flex", gap: 4, marginBottom: 2 }}>
+                              {(["manual", "formula"] as const).map((m) => (
+                                <button
+                                  key={m}
+                                  onMouseDown={(e) => { e.preventDefault(); setGoalMode(m); }}
+                                  style={{ padding: "2px 8px", fontSize: 11, borderRadius: 4, border: "1px solid #c8d0d8", background: goalMode === m ? "#5b9ea6" : "#fff", color: goalMode === m ? "#fff" : "#555", cursor: "pointer", fontWeight: goalMode === m ? 600 : 400 }}
+                                >
+                                  {m === "manual" ? "Goal" : "Formula"}
+                                </button>
+                              ))}
                             </div>
-                            {/* Value type */}
-                            <select
-                              value={tempValueType}
-                              onChange={(e) => setTempValueType(e.target.value as ValueType)}
-                              onKeyDown={(e) => { if (e.key === "Escape") setEditingGoal(null); }}
-                              style={{ border: "1px solid #c8d0d8", borderRadius: 3, fontSize: 11, padding: "2px 3px", outline: "none", background: "#fff", color: "#555" }}
-                            >
-                              <option value="number">Number</option>
-                              <option value="currency">Currency ($)</option>
-                              <option value="percentage">Percentage (%)</option>
-                            </select>
+
+                            {goalMode === "manual" ? (
+                              <>
+                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                  <select
+                                    autoFocus
+                                    value={tempGoalOp}
+                                    onChange={(e) => setTempGoalOp(e.target.value as GoalOperator)}
+                                    onKeyDown={(e) => { if (e.key === "Escape") setEditingGoal(null); }}
+                                    style={{ border: "1px solid #5b9ea6", borderRadius: 3, fontSize: 12, padding: "2px 3px", outline: "none", background: "#fff" }}
+                                  >
+                                    {([">=", "<=", ">", "<", "="] as GoalOperator[]).map((op) => (
+                                      <option key={op} value={op}>{op}</option>
+                                    ))}
+                                  </select>
+                                  <input
+                                    value={tempGoalVal}
+                                    onChange={(e) => setTempGoalVal(e.target.value)}
+                                    onBlur={() => commitGoal(kpi.id)}
+                                    onKeyDown={(e) => { if (e.key === "Enter") commitGoal(kpi.id); if (e.key === "Escape") setEditingGoal(null); }}
+                                    placeholder="value"
+                                    style={{ width: 72, border: "1px solid #5b9ea6", borderRadius: 3, padding: "2px 4px", fontSize: 13, outline: "none" }}
+                                  />
+                                </div>
+                                <select
+                                  value={tempValueType}
+                                  onChange={(e) => setTempValueType(e.target.value as ValueType)}
+                                  style={{ border: "1px solid #c8d0d8", borderRadius: 3, fontSize: 11, padding: "2px 3px", outline: "none", background: "#fff", color: "#555" }}
+                                >
+                                  <option value="number">Number</option>
+                                  <option value="currency">Currency ($)</option>
+                                  <option value="percentage">Percentage (%)</option>
+                                </select>
+                              </>
+                            ) : (
+                              <>
+                                <input
+                                  autoFocus
+                                  value={tempFormula}
+                                  onChange={(e) => setTempFormula(e.target.value)}
+                                  onBlur={() => commitGoal(kpi.id)}
+                                  onKeyDown={(e) => { if (e.key === "Enter") commitGoal(kpi.id); if (e.key === "Escape") setEditingGoal(null); }}
+                                  placeholder="[KPI A] / [KPI B] * 100"
+                                  style={{ width: "100%", border: "1px solid #5b9ea6", borderRadius: 3, padding: "3px 5px", fontSize: 12, outline: "none", boxSizing: "border-box" }}
+                                />
+                                <select
+                                  value={tempValueType}
+                                  onChange={(e) => setTempValueType(e.target.value as ValueType)}
+                                  style={{ border: "1px solid #c8d0d8", borderRadius: 3, fontSize: 11, padding: "2px 3px", outline: "none", background: "#fff", color: "#555" }}
+                                >
+                                  <option value="number">Number</option>
+                                  <option value="currency">Currency ($)</option>
+                                  <option value="percentage">Percentage (%)</option>
+                                </select>
+                                {/* Available KPI references */}
+                                <div style={{ fontSize: 10, color: "#888", marginTop: 1 }}>
+                                  Available: {section.kpis.filter((k) => k.id !== kpi.id).map((k) => (
+                                    <span
+                                      key={k.id}
+                                      onMouseDown={(e) => { e.preventDefault(); setTempFormula((f) => f + `[${k.title}]`); }}
+                                      style={{ marginRight: 4, cursor: "pointer", color: "#5b9ea6", textDecoration: "underline" }}
+                                    >
+                                      {k.title}
+                                    </span>
+                                  ))}
+                                </div>
+                              </>
+                            )}
                           </div>
                         ) : (
-                          kpi.goalValue === 0 && kpi.valueType === "number"
-                            ? <span style={{ color: "#bbb", fontSize: 12 }}>Set goal…</span>
-                            : formatGoal(kpi.goalOperator, kpi.goalValue, kpi.valueType)
+                          kpi.formula
+                            ? <span style={{ fontSize: 11, color: "#5b9ea6", fontStyle: "italic" }} title={kpi.formula}>ƒ {kpi.formula.length > 20 ? kpi.formula.slice(0, 20) + "…" : kpi.formula}</span>
+                            : kpi.goalValue === 0 && kpi.valueType === "number"
+                              ? <span style={{ color: "#bbb", fontSize: 12 }}>Set goal…</span>
+                              : formatGoal(kpi.goalOperator, kpi.goalValue, kpi.valueType)
                         )}
                       </td>
 
                       {/* Average */}
                       <td style={stickyCell(L.avg, W.avg, { textAlign: "right", fontSize: 13, color: "#555", fontWeight: 500 })}>
-                        {formatValue(avg, kpi.valueType)}
+                        {formatValue(avg, resolvedKPI.valueType)}
                       </td>
 
                       {/* Weekly values */}
                       {weeks.map((w) => {
-                        const val = kpi.weeklyValues[w.key] ?? null;
+                        const val = resolvedKPI.weeklyValues[w.key] ?? null;
                         const meets = meetsGoal(val, kpi.goalOperator, kpi.goalValue);
-                        const isEditing = editingCell?.kpiId === kpi.id && editingCell.weekKey === w.key;
+                        const isEditing = !kpi.formula && editingCell?.kpiId === kpi.id && editingCell.weekKey === w.key;
 
                         return (
                           <td
                             key={w.key}
-                            style={weekCell(meets)}
+                            style={{ ...weekCell(meets), cursor: kpi.formula ? "default" : "pointer" }}
                             onClick={() => {
-                              if (!isEditing) {
+                              if (!isEditing && !kpi.formula) {
                                 setEditingCell({ kpiId: kpi.id, weekKey: w.key });
                                 setTempValue(val != null ? String(val) : "");
                               }

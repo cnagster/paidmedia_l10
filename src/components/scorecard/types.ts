@@ -13,6 +13,7 @@ export interface KPI {
   goalValue: number;
   valueType: ValueType;
   weeklyValues: Record<string, number | null>;
+  formula?: string; // e.g. "[Comforter Spend] / [Spend] * 100"
 }
 
 export interface KPISection {

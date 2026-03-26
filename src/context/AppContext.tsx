@@ -66,11 +66,9 @@ export const MOCK_USERS: User[] = [
   { id: "u1", name: "Carlos Naguit",   initials: "CN", color: "#5b9ea6" },
   { id: "u2", name: "Naveen Jasrotia", initials: "NJ", color: "#e07b54" },
   { id: "u3", name: "Al Baltazar",     initials: "AB", color: "#9b59b6" },
-  { id: "u4", name: "Jermin David",    initials: "JD", color: "#27ae60" },
-  { id: "u5", name: "Miguel Naguit",   initials: "MN", color: "#2980b9" },
-  { id: "u6", name: "Rafael Guida",    initials: "RG", color: "#e74c3c" },
-  { id: "u7", name: "Andy Nguyen",     initials: "AN", color: "#f39c12" },
-  { id: "u8", name: "Kevin Louie",     initials: "KL", color: "#1abc9c" },
+  { id: "u4", name: "Miguel Naguit",   initials: "MN", color: "#2980b9" },
+  { id: "u5", name: "Jermin David",    initials: "JD", color: "#27ae60" },
+  { id: "u6", name: "Dun Abiera",      initials: "DA", color: "#e74c3c" },
 ];
 
 const INITIAL_ISSUES: IssueItem[] = [];
