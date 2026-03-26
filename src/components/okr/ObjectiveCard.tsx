@@ -354,9 +354,8 @@ export default function ObjectiveCard({ objective, index, allUsers, onChange, on
                 color: "#1a1a2e",
                 cursor: "default",
                 userSelect: "none",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
+                whiteSpace: "normal",
+                wordBreak: "break-word",
               }}
               title="Double-click to edit"
             >
@@ -484,9 +483,8 @@ export default function ObjectiveCard({ objective, index, allUsers, onChange, on
                     color: "#333",
                     cursor: "default",
                     userSelect: "none",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
+                    whiteSpace: "normal",
+                    wordBreak: "break-word",
                   }}
                   title="Double-click to edit"
                 >
