@@ -73,22 +73,9 @@ export const MOCK_USERS: User[] = [
   { id: "u8", name: "Kevin Louie",     initials: "KL", color: "#1abc9c" },
 ];
 
-const INITIAL_ISSUES: IssueItem[] = [
-  { id: "i1", title: "Brick'd gummies will be ready in 4 weeks time (end of march)", description: "", dueBy: "", resolved: false, team: "Marketing", assignees: [MOCK_USERS[1]], term: "short", createdAt: "Mar 3" },
-  { id: "i2", title: "Launch 2ml Free + Shipping Subscription INTL April 1",          description: "", dueBy: "", resolved: false, team: "Marketing", assignees: [MOCK_USERS[1]], term: "short", createdAt: "Mar 8" },
-];
+const INITIAL_ISSUES: IssueItem[] = [];
 
-const INITIAL_TODOS: TodoItem[] = [
-  { id: "t1", title: "Funnelish Subscription Automation error with shopify and stripe charges", description: "", dueBy: "Apr 1", done: false, team: "Marketing", isPrivate: false, assignees: [MOCK_USERS[0]] },
-  { id: "t2", title: "Get Brick'd gummies LP ready (copy, structure)", description: "", dueBy: "Apr 1", done: false, team: "Marketing", isPrivate: false, assignees: [MOCK_USERS[1]] },
-  { id: "t3", title: "Get Brick'd gummies LP ready (copy, structure)", description: "", dueBy: "Apr 1", done: false, team: "Marketing", isPrivate: false, assignees: [MOCK_USERS[0]] },
-  { id: "t4", title: "Long-form ads for YT (AI generated)", description: "", dueBy: "Mar 31", done: false, team: "Marketing", isPrivate: false, assignees: [MOCK_USERS[2]] },
-  { id: "t5", title: "Launch and test YouTube long form", description: "", dueBy: "Mar 31", done: false, team: "Marketing", isPrivate: false, assignees: [MOCK_USERS[3]] },
-  { id: "t6", title: "Check CupidsFemme and Glamory shopify atc loading speed vs Cupids and find solution", description: "", dueBy: "Apr 1", done: false, team: "Marketing", isPrivate: false, assignees: [MOCK_USERS[0]] },
-  { id: "t7", title: "Brief Brick'd gummies ads and get them ready for launch by end of week 1 or 2 of April", description: "", dueBy: "Apr 1", done: false, team: "Marketing", isPrivate: false, assignees: [MOCK_USERS[4]] },
-  { id: "t8", title: "Prepare INTL 2ml Free + Shipping Subscription Offer to launch on Meta. (Shopify)", description: "", dueBy: "Apr 1", done: false, team: "Marketing", isPrivate: false, assignees: [MOCK_USERS[5]] },
-  { id: "t9", title: "Setup compliance price test for funnelish. compare-at price at $75. (currently at $150)", description: "", dueBy: "Apr 1", done: true, team: "Marketing", isPrivate: false, assignees: [MOCK_USERS[0]] },
-];
+const INITIAL_TODOS: TodoItem[] = [];
 
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {

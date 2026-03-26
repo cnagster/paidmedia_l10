@@ -1,14 +1,12 @@
 import { useState } from "react";
 
 const CREDENTIALS = [
-  { username: "carlos",  password: "paidmedia2026" },
-  { username: "naveen",  password: "paidmedia2026" },
-  { username: "al",      password: "paidmedia2026" },
-  { username: "jermin",  password: "paidmedia2026" },
-  { username: "miguel",  password: "paidmedia2026" },
-  { username: "rafael",  password: "paidmedia2026" },
-  { username: "andy",    password: "paidmedia2026" },
-  { username: "kevin",   password: "paidmedia2026" },
+  { username: "carlos",    password: "paidmedia2026" },
+  { username: "naveen",    password: "paidmedia2026" },
+  { username: "miguel",    password: "paidmedia2026" },
+  { username: "jermin",    password: "paidmedia2026" },
+  { username: "dun",       password: "paidmedia2026" },
+  { username: "albaltazar", password: "paidmedia2026" },
 ];
 
 interface Props {
