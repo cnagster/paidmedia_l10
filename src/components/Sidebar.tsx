@@ -8,10 +8,10 @@ interface Props {
 const navItems: { id: NavItem; label: string; icon: string }[] = [
   { id: "overview",  label: "Overview",  icon: "⊙" },
   { id: "scorecard", label: "Scorecard", icon: "↗" },
+  { id: "okrs",      label: "OKRs",      icon: "◇" },
   { id: "headlines", label: "Headlines", icon: "◻" },
   { id: "todos",     label: "To-Dos",    icon: "☑" },
   { id: "issues",    label: "Issues",    icon: "⚑" },
-  { id: "okrs",      label: "OKRs",      icon: "◇" },
 ];
 
 export default function Sidebar({ activeNav, onNavChange }: Props) {

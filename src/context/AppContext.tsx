@@ -58,6 +58,7 @@ interface AppContextType {
   updateHeadline: (id: string, changes: Partial<HeadlineItem>) => void;
   deleteHeadline: (id: string) => void;
   archiveHeadline: (id: string) => void;
+  reorderHeadlines: (fromId: string, toId: string) => void;
 }
 
 export const AppContext = createContext<AppContextType>({} as AppContextType);
@@ -145,9 +146,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   function archiveHeadline(id: string) {
     setHeadlines((prev) => prev.map((h) => (h.id === id ? { ...h, archived: !h.archived } : h)));
   }
+  function reorderHeadlines(fromId: string, toId: string) {
+    setHeadlines((prev) => {
+      const fromIdx = prev.findIndex((h) => h.id === fromId);
+      const toIdx   = prev.findIndex((h) => h.id === toId);
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return next;
+    });
+  }
 
   return (
-    <AppContext.Provider value={{ todos, issues, headlines, users: MOCK_USERS, addTodo, updateTodo, toggleTodo, deleteTodo, addIssue, updateIssue, resolveIssue, deleteIssue, reorderIssues, addHeadline, updateHeadline, deleteHeadline, archiveHeadline }}>
+    <AppContext.Provider value={{ todos, issues, headlines, users: MOCK_USERS, addTodo, updateTodo, toggleTodo, deleteTodo, addIssue, updateIssue, resolveIssue, deleteIssue, reorderIssues, addHeadline, updateHeadline, deleteHeadline, archiveHeadline, reorderHeadlines }}>
       {children}
     </AppContext.Provider>
   );

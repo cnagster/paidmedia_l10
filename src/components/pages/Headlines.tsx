@@ -110,12 +110,28 @@ function CreateHeadlineModal({ onClose }: { onClose: () => void }) {
 
 // ── Headline row ──────────────────────────────────────────────────────────────
 
-function HeadlineRow({ headline, onArchive, onDelete }: { headline: HeadlineItem; onArchive: () => void; onDelete: () => void }) {
+function HeadlineRow({ headline, isDragOver, onArchive, onDelete, onDragStart, onDragOver, onDrop, onDragEnd }: {
+  headline: HeadlineItem;
+  isDragOver: boolean;
+  onArchive: () => void;
+  onDelete: () => void;
+  onDragStart: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: () => void;
+  onDragEnd: () => void;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div style={{ borderBottom: "1px solid #f5f5f5", padding: "14px 24px", background: "#fff" }}>
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+      style={{ borderBottom: "1px solid #f5f5f5", padding: "14px 24px", background: "#fff", borderTop: isDragOver ? "2px solid #5b9ea6" : "2px solid transparent", cursor: "grab" }}
+    >
       <div style={{ display: "grid", gridTemplateColumns: "28px 36px 1fr 90px 44px", alignItems: "center", gap: 12 }}>
         {/* Archive checkbox */}
         <button
@@ -186,10 +202,12 @@ function HeadlineRow({ headline, onArchive, onDelete }: { headline: HeadlineItem
 // ── Main Headlines page ───────────────────────────────────────────────────────
 
 export default function Headlines() {
-  const { headlines, users, archiveHeadline, deleteHeadline } = useApp();
+  const { headlines, users, archiveHeadline, deleteHeadline, reorderHeadlines } = useApp();
   const [showArchive, setShowArchive] = useState(false);
   const [search,      setSearch]      = useState("");
   const [showModal,   setShowModal]   = useState(false);
+  const [dragOverId,  setDragOverId]  = useState<string | null>(null);
+  const dragId = useRef<string | null>(null);
 
   const filtered = headlines.filter((h) => {
     if (!showArchive && h.archived) return false;
@@ -279,8 +297,13 @@ export default function Headlines() {
             <HeadlineRow
               key={h.id}
               headline={h}
+              isDragOver={dragOverId === h.id}
               onArchive={() => archiveHeadline(h.id)}
               onDelete={() => deleteHeadline(h.id)}
+              onDragStart={() => { dragId.current = h.id; }}
+              onDragOver={(e) => { e.preventDefault(); setDragOverId(h.id); }}
+              onDrop={() => { if (dragId.current && dragId.current !== h.id) reorderHeadlines(dragId.current, h.id); dragId.current = null; setDragOverId(null); }}
+              onDragEnd={() => { dragId.current = null; setDragOverId(null); }}
             />
           ))
         )}
