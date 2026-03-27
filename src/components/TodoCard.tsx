@@ -23,6 +23,7 @@ export default function TodoCard({ title, type }: Props) {
   const baseTodos = todos.filter((t) => {
     if (type === "team"    &&  t.isPrivate) return false;
     if (type === "private" && !t.isPrivate) return false;
+    if (type === "team" && !currentUser) return false;
     if (type === "team" && currentUser && !t.assignees.some((u) => u.id === currentUser.id)) return false;
     if (!showDone && t.done) return false;
     if (showDone  && !t.done) return false;

@@ -30,7 +30,9 @@ function AppShell() {
 }
 
 export default function App() {
-  const [authed,   setAuthed]   = useState(() => localStorage.getItem("ninety-auth") === "1");
+  const [authed,   setAuthed]   = useState(() =>
+    localStorage.getItem("ninety-auth") === "1" && !!localStorage.getItem("ninety-auth-user")
+  );
   const [username, setUsername] = useState(() => localStorage.getItem("ninety-auth-user") ?? "");
 
   if (!authed) return <Login onLogin={(u) => { setAuthed(true); setUsername(u); }} />;
