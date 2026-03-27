@@ -45,6 +45,7 @@ interface AppContextType {
   issues: IssueItem[];
   headlines: HeadlineItem[];
   users: User[];
+  currentUser: User | null;
   addTodo: (todo: Omit<TodoItem, "id">) => void;
   updateTodo: (id: string, changes: Partial<TodoItem>) => void;
   toggleTodo: (id: string) => void;
@@ -84,7 +85,12 @@ function loadFromStorage<T>(key: string, fallback: T): T {
   return fallback;
 }
 
-export function AppProvider({ children }: { children: ReactNode }) {
+const USERNAME_TO_ID: Record<string, string> = {
+  carlos: "u1", naveen: "u2", albaltazar: "u3", miguel: "u4", jermin: "u5", dun: "u6",
+};
+
+export function AppProvider({ children, username }: { children: ReactNode; username: string }) {
+  const currentUser = MOCK_USERS.find((u) => u.id === USERNAME_TO_ID[username]) ?? null;
   const [todos,     setTodos]     = useState<TodoItem[]>(() => loadFromStorage("ninety-todos",      INITIAL_TODOS));
   const [issues,    setIssues]    = useState<IssueItem[]>(() => loadFromStorage("ninety-issues",    INITIAL_ISSUES));
   const [headlines, setHeadlines] = useState<HeadlineItem[]>(() => loadFromStorage("ninety-headlines", []));
@@ -159,7 +165,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ todos, issues, headlines, users: MOCK_USERS, addTodo, updateTodo, toggleTodo, deleteTodo, addIssue, updateIssue, resolveIssue, deleteIssue, reorderIssues, addHeadline, updateHeadline, deleteHeadline, archiveHeadline, reorderHeadlines }}>
+    <AppContext.Provider value={{ todos, issues, headlines, users: MOCK_USERS, currentUser, addTodo, updateTodo, toggleTodo, deleteTodo, addIssue, updateIssue, resolveIssue, deleteIssue, reorderIssues, addHeadline, updateHeadline, deleteHeadline, archiveHeadline, reorderHeadlines }}>
       {children}
     </AppContext.Provider>
   );

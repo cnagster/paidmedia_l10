@@ -10,7 +10,7 @@ const CREDENTIALS = [
 ];
 
 interface Props {
-  onLogin: () => void;
+  onLogin: (username: string) => void;
 }
 
 export default function Login({ onLogin }: Props) {
@@ -26,7 +26,7 @@ export default function Login({ onLogin }: Props) {
     if (match) {
       localStorage.setItem("ninety-auth", "1");
       localStorage.setItem("ninety-auth-user", match.username);
-      onLogin();
+      onLogin(match.username);
     } else {
       setError("Invalid username or password.");
     }
