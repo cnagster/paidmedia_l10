@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useApp } from "../../context/AppContext";
 import type { IssueItem, User } from "../../context/AppContext";
 import CreateItemModal from "../scorecard/CreateItemModal";
+import ContextMenu from "../scorecard/ContextMenu";
 import UserPicker from "../ui/UserPicker";
 
 function Avatar({ user, size = 30 }: { user: User; size?: number }) {
@@ -52,13 +53,15 @@ interface SectionProps {
   onUpdateOwner: (id: string, assignees: User[]) => void;
   onReorder: (fromId: string, toId: string) => void;
   onAdd: () => void;
+  onCreateTodoFromIssue: (issueTitle: string) => void;
 }
 
-function IssueSection({ label, issues, allUsers, onResolve, onDelete, onUpdateOwner, onReorder, onAdd }: SectionProps) {
+function IssueSection({ label, issues, allUsers, onResolve, onDelete, onUpdateOwner, onReorder, onAdd, onCreateTodoFromIssue }: SectionProps) {
   const [page, setPage]       = useState(1);
   const [perPage, setPerPage] = useState(50);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [pickerFor, setPickerFor]   = useState<string | null>(null);
+  const [ctxMenu, setCtxMenu]       = useState<{ x: number; y: number; issueTitle: string } | null>(null);
   const ownerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const dragId    = useRef<string | null>(null);
 
@@ -125,6 +128,7 @@ function IssueSection({ label, issues, allUsers, onResolve, onDelete, onUpdateOw
               onDragOver={(e) => handleDragOver(e, issue.id)}
               onDrop={() => handleDrop(issue.id)}
               onDragEnd={handleDragEnd}
+              onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, issueTitle: issue.title }); }}
               style={{
                 display: "grid",
                 gridTemplateColumns: "56px 1fr 100px 70px 44px",
@@ -188,6 +192,15 @@ function IssueSection({ label, issues, allUsers, onResolve, onDelete, onUpdateOw
         })
       )}
 
+      {ctxMenu && (
+        <ContextMenu
+          x={ctxMenu.x} y={ctxMenu.y}
+          onCreateTodo={() => { onCreateTodoFromIssue(ctxMenu.issueTitle); setCtxMenu(null); }}
+          onCreateIssue={() => setCtxMenu(null)}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
+
       {/* Card footer */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 24px", borderTop: "1px solid #f0f0f0" }}>
         <button onClick={onAdd} style={{ background: "none", border: "none", color: "#5b9ea6", fontSize: 14, cursor: "pointer", padding: 0 }}>
@@ -227,12 +240,14 @@ function IssueSection({ label, issues, allUsers, onResolve, onDelete, onUpdateOw
 export default function Issues() {
   const { issues, resolveIssue, deleteIssue, addIssue, updateIssue, reorderIssues, users } = useApp();
 
-  const [showArchive, setShowArchive] = useState(false);
-  const [search,      setSearch]      = useState("");
-  const [showModal,   setShowModal]   = useState(false);
-  const [addTerm,     setAddTerm]     = useState<"short" | "long">("short");
-  const [addingFor,   setAddingFor]   = useState<"short" | "long" | null>(null);
-  const [inlineTitle, setInlineTitle] = useState("");
+  const [showArchive,   setShowArchive]   = useState(false);
+  const [search,        setSearch]        = useState("");
+  const [showModal,     setShowModal]     = useState(false);
+  const [modalType,     setModalType]     = useState<"todo" | "issue">("issue");
+  const [modalTitle,    setModalTitle]    = useState("");
+  const [addTerm,       setAddTerm]       = useState<"short" | "long">("short");
+  const [addingFor,     setAddingFor]     = useState<"short" | "long" | null>(null);
+  const [inlineTitle,   setInlineTitle]   = useState("");
 
   function sectionIssues(term: "short" | "long") {
     return issues.filter((i) => {
@@ -271,7 +286,7 @@ export default function Issues() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button style={{ background: "none", border: "none", cursor: "pointer", color: "#888", fontSize: 20 }}>🔔</button>
-          <button onClick={() => setShowModal(true)} style={{ padding: "8px 20px", background: "#5b9ea6", color: "#fff", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+          <button onClick={() => { setModalType("issue"); setModalTitle(""); setShowModal(true); }} style={{ padding: "8px 20px", background: "#5b9ea6", color: "#fff", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
             Create
           </button>
         </div>
@@ -318,6 +333,7 @@ export default function Issues() {
           onUpdateOwner={(id, assignees) => updateIssue(id, { assignees })}
           onReorder={(fromId, toId) => reorderIssues("short", fromId, toId)}
           onAdd={() => handleAdd("short")}
+          onCreateTodoFromIssue={(title) => { setModalType("todo"); setModalTitle(title); setShowModal(true); }}
         />
         {addingFor === "short" && (
           <InlineAdd value={inlineTitle} onChange={setInlineTitle} onSubmit={submitInline} onCancel={() => setAddingFor(null)} />
@@ -332,6 +348,7 @@ export default function Issues() {
           onUpdateOwner={(id, assignees) => updateIssue(id, { assignees })}
           onReorder={(fromId, toId) => reorderIssues("long", fromId, toId)}
           onAdd={() => handleAdd("long")}
+          onCreateTodoFromIssue={(title) => { setModalType("todo"); setModalTitle(title); setShowModal(true); }}
         />
         {addingFor === "long" && (
           <InlineAdd value={inlineTitle} onChange={setInlineTitle} onSubmit={submitInline} onCancel={() => setAddingFor(null)} />
@@ -339,7 +356,7 @@ export default function Issues() {
       </div>
 
       {showModal && (
-        <CreateItemModal defaultType="issue" kpiTitle="" prefillDescription="" onClose={() => setShowModal(false)} />
+        <CreateItemModal defaultType={modalType} kpiTitle={modalTitle} prefillDescription="" onClose={() => setShowModal(false)} />
       )}
     </div>
   );

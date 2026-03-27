@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { useApp } from "../context/AppContext";
 
+// Map login username → user id
+const USERNAME_TO_ID: Record<string, string> = {
+  carlos:     "u1",
+  naveen:     "u2",
+  albaltazar: "u3",
+  miguel:     "u4",
+  jermin:     "u5",
+  dun:        "u6",
+};
+
 interface Props {
   title: string;
   type: "team" | "private";
@@ -10,13 +20,19 @@ export default function TodoCard({ title, type }: Props) {
   const { todos, toggleTodo, addTodo } = useApp();
   const [showDone, setShowDone] = useState(false);
 
+  const loggedInUsername = localStorage.getItem("ninety-auth-user") ?? "";
+  const loggedInUserId   = USERNAME_TO_ID[loggedInUsername] ?? "";
+
   const filtered = todos.filter((t) => {
     if (type === "team"    &&  t.isPrivate) return false;
     if (type === "private" && !t.isPrivate) return false;
+    // Team to-dos: only show ones assigned to the current user
+    if (type === "team" && loggedInUserId && !t.assignees.some((u) => u.id === loggedInUserId)) return false;
     if (!showDone && t.done) return false;
     if (showDone  && !t.done) return false;
     return true;
   });
+
 
   function handleAdd() {
     const t = prompt("New to-do title:");

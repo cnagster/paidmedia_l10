@@ -25,6 +25,7 @@ export default function Login({ onLogin }: Props) {
     );
     if (match) {
       localStorage.setItem("ninety-auth", "1");
+      localStorage.setItem("ninety-auth-user", match.username);
       onLogin();
     } else {
       setError("Invalid username or password.");

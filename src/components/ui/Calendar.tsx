@@ -93,9 +93,24 @@ export default function Calendar({ value, anchorEl, onChange, onClose }: Props) 
       {/* Month nav */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <button onClick={prevMonth} style={navBtn}>‹</button>
-        <span style={{ fontWeight: 600, fontSize: 14, color: "#1a1a2e" }}>
-          {MONTHS[viewMonth]} {viewYear}
-        </span>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <select
+            value={viewMonth}
+            onChange={(e) => setViewMonth(Number(e.target.value))}
+            style={{ border: "1px solid #e2e6ea", borderRadius: 5, padding: "3px 6px", fontSize: 13, fontWeight: 600, color: "#1a1a2e", background: "#fff", cursor: "pointer" }}
+          >
+            {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
+          </select>
+          <select
+            value={viewYear}
+            onChange={(e) => setViewYear(Number(e.target.value))}
+            style={{ border: "1px solid #e2e6ea", borderRadius: 5, padding: "3px 6px", fontSize: 13, fontWeight: 600, color: "#1a1a2e", background: "#fff", cursor: "pointer" }}
+          >
+            {Array.from({ length: 11 }, (_, i) => today.getFullYear() - 1 + i).map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
         <button onClick={nextMonth} style={navBtn}>›</button>
       </div>
 
