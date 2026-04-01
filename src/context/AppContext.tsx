@@ -121,29 +121,44 @@ export function AppProvider({ children, username }: { children: ReactNode; usern
   // Run migration once on first load
   useEffect(() => { migrateFromLocalStorage(); }, []);
 
+  // Timeout fallback — unblock UI after 8s even if Firestore never responds
+  useEffect(() => {
+    const t = setTimeout(() => setLoaded({ todos: true, issues: true, headlines: true }), 8000);
+    return () => clearTimeout(t);
+  }, []);
+
   // Real-time Firestore listeners
   useEffect(() => {
-    return onSnapshot(todosRef, (snap) => {
-      if (snap.metadata.hasPendingWrites) return;
-      setTodos(snap.exists() ? (snap.data().items ?? []) : []);
-      setLoaded((p) => ({ ...p, todos: true }));
-    });
+    return onSnapshot(todosRef,
+      (snap) => {
+        if (snap.metadata.hasPendingWrites) return;
+        setTodos(snap.exists() ? (snap.data().items ?? []) : []);
+        setLoaded((p) => ({ ...p, todos: true }));
+      },
+      (err) => { console.error("todos listener:", err); setLoaded((p) => ({ ...p, todos: true })); }
+    );
   }, []);
 
   useEffect(() => {
-    return onSnapshot(issuesRef, (snap) => {
-      if (snap.metadata.hasPendingWrites) return;
-      setIssues(snap.exists() ? (snap.data().items ?? []) : []);
-      setLoaded((p) => ({ ...p, issues: true }));
-    });
+    return onSnapshot(issuesRef,
+      (snap) => {
+        if (snap.metadata.hasPendingWrites) return;
+        setIssues(snap.exists() ? (snap.data().items ?? []) : []);
+        setLoaded((p) => ({ ...p, issues: true }));
+      },
+      (err) => { console.error("issues listener:", err); setLoaded((p) => ({ ...p, issues: true })); }
+    );
   }, []);
 
   useEffect(() => {
-    return onSnapshot(headlinesRef, (snap) => {
-      if (snap.metadata.hasPendingWrites) return;
-      setHeadlines(snap.exists() ? (snap.data().items ?? []) : []);
-      setLoaded((p) => ({ ...p, headlines: true }));
-    });
+    return onSnapshot(headlinesRef,
+      (snap) => {
+        if (snap.metadata.hasPendingWrites) return;
+        setHeadlines(snap.exists() ? (snap.data().items ?? []) : []);
+        setLoaded((p) => ({ ...p, headlines: true }));
+      },
+      (err) => { console.error("headlines listener:", err); setLoaded((p) => ({ ...p, headlines: true })); }
+    );
   }, []);
 
   // ── Todos ──────────────────────────────────────────────
