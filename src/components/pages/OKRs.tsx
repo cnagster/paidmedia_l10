@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import type { Objective, OKRUser } from "../okr/types";
 import ObjectiveCard from "../okr/ObjectiveCard";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { db } from "../../firebase";
 
 const OKR_USERS: OKRUser[] = [
   { id: "u1", name: "Carlos Naguit",   initials: "CN", color: "#5b9ea6" },
@@ -11,11 +13,9 @@ const OKR_USERS: OKRUser[] = [
   { id: "u6", name: "Dun Abiera",      initials: "DA", color: "#e74c3c" },
 ];
 
-function u(id: string): OKRUser {
-  return OKR_USERS.find((x) => x.id === id)!;
-}
-
-const INITIAL_OBJECTIVES: Objective[] = [
+function u(id: string): OKRUser { return OKR_USERS.find((x) => x.id === id) ?? OKR_USERS[0]; }
+// Legacy seed data (kept for reference, not loaded)
+const _INITIAL_OBJECTIVES: Objective[] = [
   {
     id: "o1",
     title: "Achieve $51M Shopify Revenue (41% increase vs. 2025)",
@@ -119,38 +119,34 @@ const INITIAL_OBJECTIVES: Objective[] = [
   },
 ];
 
-const STORAGE_KEY = "ninety-okr-all-periods";
 const PERIODS = ["2026 Annual OKR", "Q1 OKR", "Q2 OKR", "Q3 OKR", "Q4 OKR"] as const;
 type Period = (typeof PERIODS)[number];
 type AllPeriods = Record<Period, Objective[]>;
 
-function loadAll(): AllPeriods {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as AllPeriods;
-  } catch { /* fall through */ }
-  // Seed "2026 Annual OKR" with initial data; others start empty
-  return {
-    "2026 Annual OKR": INITIAL_OBJECTIVES,
-    "Q1 OKR": [],
-    "Q2 OKR": [],
-    "Q3 OKR": [],
-    "Q4 OKR": [],
-  };
-}
+const EMPTY_PERIODS: AllPeriods = { "2026 Annual OKR": [], "Q1 OKR": [], "Q2 OKR": [], "Q3 OKR": [], "Q4 OKR": [] };
+const okrsRef = doc(db, "app-data", "okrs");
 
 export default function OKRs() {
-  const [allPeriods, setAllPeriods] = useState<AllPeriods>(loadAll);
+  const [allPeriods, setAllPeriods] = useState<AllPeriods>(EMPTY_PERIODS);
   const [activePeriod, setActivePeriod] = useState<Period>("2026 Annual OKR");
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(allPeriods));
-  }, [allPeriods]);
+    return onSnapshot(okrsRef, (snap) => {
+      if (snap.metadata.hasPendingWrites) return;
+      setAllPeriods(snap.exists() ? (snap.data().periods ?? EMPTY_PERIODS) : EMPTY_PERIODS);
+      setLoaded(true);
+    });
+  }, []);
 
   const objectives = allPeriods[activePeriod];
 
   function setObjectives(updater: (prev: Objective[]) => Objective[]) {
-    setAllPeriods((prev) => ({ ...prev, [activePeriod]: updater(prev[activePeriod]) }));
+    setAllPeriods((prev) => {
+      const next = { ...prev, [activePeriod]: updater(prev[activePeriod]) };
+      setDoc(okrsRef, { periods: next });
+      return next;
+    });
   }
 
   function updateObjective(id: string, updated: Objective) {
@@ -183,6 +179,8 @@ export default function OKRs() {
   function ownerUser(name: string): OKRUser {
     return OKR_USERS.find((u) => u.name === name) ?? { id: name, name, initials: name.slice(0, 2).toUpperCase(), color: "#8e9aaf" };
   }
+
+  if (!loaded) return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontSize: 14, color: "#888" }}>Loading…</div>;
 
   // Global objective index (O1, O2, O3 … across all owners)
   const globalIndex: Record<string, number> = {};

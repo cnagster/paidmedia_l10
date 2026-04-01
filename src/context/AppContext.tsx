@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { db } from "../firebase";
 
 export interface User {
   id: string;
@@ -73,57 +75,76 @@ export const MOCK_USERS: User[] = [
   { id: "u6", name: "Dun Abiera",      initials: "DA", color: "#e74c3c" },
 ];
 
-const INITIAL_ISSUES: IssueItem[] = [];
-
-const INITIAL_TODOS: TodoItem[] = [];
-
-function loadFromStorage<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw) as T;
-  } catch { /* fall through */ }
-  return fallback;
-}
-
 const USERNAME_TO_ID: Record<string, string> = {
   carlos: "u1", naveen: "u2", albaltazar: "u3", miguel: "u4", jermin: "u5", dun: "u6",
 };
 
+const todosRef     = doc(db, "app-data", "todos");
+const issuesRef    = doc(db, "app-data", "issues");
+const headlinesRef = doc(db, "app-data", "headlines");
+
 export function AppProvider({ children, username }: { children: ReactNode; username: string }) {
   const currentUser = MOCK_USERS.find((u) => u.id === USERNAME_TO_ID[username]) ?? null;
-  const [todos,     setTodos]     = useState<TodoItem[]>(() => loadFromStorage("ninety-todos",      INITIAL_TODOS));
-  const [issues,    setIssues]    = useState<IssueItem[]>(() => loadFromStorage("ninety-issues",    INITIAL_ISSUES));
-  const [headlines, setHeadlines] = useState<HeadlineItem[]>(() => loadFromStorage("ninety-headlines", []));
 
-  useEffect(() => { localStorage.setItem("ninety-todos",      JSON.stringify(todos));     }, [todos]);
-  useEffect(() => { localStorage.setItem("ninety-issues",     JSON.stringify(issues));    }, [issues]);
-  useEffect(() => { localStorage.setItem("ninety-headlines",  JSON.stringify(headlines)); }, [headlines]);
+  const [todos,     setTodos]     = useState<TodoItem[]>([]);
+  const [issues,    setIssues]    = useState<IssueItem[]>([]);
+  const [headlines, setHeadlines] = useState<HeadlineItem[]>([]);
+  const [loaded,    setLoaded]    = useState({ todos: false, issues: false, headlines: false });
 
+  // Real-time Firestore listeners
+  useEffect(() => {
+    return onSnapshot(todosRef, (snap) => {
+      if (snap.metadata.hasPendingWrites) return;
+      setTodos(snap.exists() ? (snap.data().items ?? []) : []);
+      setLoaded((p) => ({ ...p, todos: true }));
+    });
+  }, []);
+
+  useEffect(() => {
+    return onSnapshot(issuesRef, (snap) => {
+      if (snap.metadata.hasPendingWrites) return;
+      setIssues(snap.exists() ? (snap.data().items ?? []) : []);
+      setLoaded((p) => ({ ...p, issues: true }));
+    });
+  }, []);
+
+  useEffect(() => {
+    return onSnapshot(headlinesRef, (snap) => {
+      if (snap.metadata.hasPendingWrites) return;
+      setHeadlines(snap.exists() ? (snap.data().items ?? []) : []);
+      setLoaded((p) => ({ ...p, headlines: true }));
+    });
+  }, []);
+
+  // ── Todos ──────────────────────────────────────────────
   function addTodo(todo: Omit<TodoItem, "id">) {
-    setTodos((prev) => [{ ...todo, id: Date.now().toString() }, ...prev]);
+    const newItem = { ...todo, id: Date.now().toString() };
+    setTodos((prev) => { const next = [newItem, ...prev]; setDoc(todosRef, { items: next }); return next; });
   }
   function updateTodo(id: string, changes: Partial<TodoItem>) {
-    setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, ...changes } : t)));
+    setTodos((prev) => { const next = prev.map((t) => (t.id === id ? { ...t, ...changes } : t)); setDoc(todosRef, { items: next }); return next; });
   }
   function deleteTodo(id: string) {
-    setTodos((prev) => prev.filter((t) => t.id !== id));
+    setTodos((prev) => { const next = prev.filter((t) => t.id !== id); setDoc(todosRef, { items: next }); return next; });
   }
   function toggleTodo(id: string) {
-    setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+    setTodos((prev) => { const next = prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)); setDoc(todosRef, { items: next }); return next; });
   }
 
+  // ── Issues ─────────────────────────────────────────────
   function addIssue(issue: Omit<IssueItem, "id" | "createdAt">) {
     const createdAt = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    setIssues((prev) => [...prev, { ...issue, id: Date.now().toString(), createdAt }]);
+    const newItem = { ...issue, id: Date.now().toString(), createdAt };
+    setIssues((prev) => { const next = [...prev, newItem]; setDoc(issuesRef, { items: next }); return next; });
   }
   function updateIssue(id: string, changes: Partial<IssueItem>) {
-    setIssues((prev) => prev.map((i) => (i.id === id ? { ...i, ...changes } : i)));
+    setIssues((prev) => { const next = prev.map((i) => (i.id === id ? { ...i, ...changes } : i)); setDoc(issuesRef, { items: next }); return next; });
   }
   function deleteIssue(id: string) {
-    setIssues((prev) => prev.filter((i) => i.id !== id));
+    setIssues((prev) => { const next = prev.filter((i) => i.id !== id); setDoc(issuesRef, { items: next }); return next; });
   }
   function resolveIssue(id: string) {
-    setIssues((prev) => prev.map((i) => (i.id === id ? { ...i, resolved: !i.resolved } : i)));
+    setIssues((prev) => { const next = prev.map((i) => (i.id === id ? { ...i, resolved: !i.resolved } : i)); setDoc(issuesRef, { items: next }); return next; });
   }
   function reorderIssues(term: "short" | "long", fromId: string, toId: string) {
     setIssues((prev) => {
@@ -135,22 +156,26 @@ export function AppProvider({ children, username }: { children: ReactNode; usern
       const next = [...group];
       const [moved] = next.splice(fromIdx, 1);
       next.splice(toIdx, 0, moved);
-      return [...rest, ...next];
+      const result = [...rest, ...next];
+      setDoc(issuesRef, { items: result });
+      return result;
     });
   }
 
+  // ── Headlines ──────────────────────────────────────────
   function addHeadline(headline: Omit<HeadlineItem, "id" | "createdAt">) {
     const createdAt = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    setHeadlines((prev) => [{ ...headline, id: Date.now().toString(), createdAt }, ...prev]);
+    const newItem = { ...headline, id: Date.now().toString(), createdAt };
+    setHeadlines((prev) => { const next = [newItem, ...prev]; setDoc(headlinesRef, { items: next }); return next; });
   }
   function updateHeadline(id: string, changes: Partial<HeadlineItem>) {
-    setHeadlines((prev) => prev.map((h) => (h.id === id ? { ...h, ...changes } : h)));
+    setHeadlines((prev) => { const next = prev.map((h) => (h.id === id ? { ...h, ...changes } : h)); setDoc(headlinesRef, { items: next }); return next; });
   }
   function deleteHeadline(id: string) {
-    setHeadlines((prev) => prev.filter((h) => h.id !== id));
+    setHeadlines((prev) => { const next = prev.filter((h) => h.id !== id); setDoc(headlinesRef, { items: next }); return next; });
   }
   function archiveHeadline(id: string) {
-    setHeadlines((prev) => prev.map((h) => (h.id === id ? { ...h, archived: !h.archived } : h)));
+    setHeadlines((prev) => { const next = prev.map((h) => (h.id === id ? { ...h, archived: !h.archived } : h)); setDoc(headlinesRef, { items: next }); return next; });
   }
   function reorderHeadlines(fromId: string, toId: string) {
     setHeadlines((prev) => {
@@ -160,8 +185,13 @@ export function AppProvider({ children, username }: { children: ReactNode; usern
       const next = [...prev];
       const [moved] = next.splice(fromIdx, 1);
       next.splice(toIdx, 0, moved);
+      setDoc(headlinesRef, { items: next });
       return next;
     });
+  }
+
+  if (!loaded.todos || !loaded.issues || !loaded.headlines) {
+    return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontSize: 14, color: "#888" }}>Loading…</div>;
   }
 
   return (

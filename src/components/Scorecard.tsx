@@ -3,52 +3,43 @@ import type { CSSProperties } from "react";
 import KPISectionComponent from "./scorecard/KPISection";
 import { generateWeeks } from "./scorecard/utils";
 import type { KPISection } from "./scorecard/types";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { db } from "../firebase";
 
 const WEEKS = generateWeeks(13);
-
-const INITIAL_SECTIONS: KPISection[] = [];
-
 const TABS = ["Weekly", "Monthly", "Quarterly", "Annual"] as const;
-
-const STORAGE_KEY = "ninety-scorecard-sections";
-
-function loadSections(): KPISection[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as KPISection[];
-  } catch {
-    // corrupted data — fall through to default
-  }
-  return INITIAL_SECTIONS;
-}
+const scorecardRef = doc(db, "app-data", "scorecard");
 
 export default function Scorecard() {
-  const [sections, setSections] = useState<KPISection[]>(loadSections);
+  const [sections, setSections] = useState<KPISection[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
-  // Persist on every change
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sections));
-  }, [sections]);
+    return onSnapshot(scorecardRef, (snap) => {
+      if (snap.metadata.hasPendingWrites) return;
+      setSections(snap.exists() ? (snap.data().sections ?? []) : []);
+      setLoaded(true);
+    });
+  }, []);
   const [activeTab] = useState<(typeof TABS)[number]>("Weekly");
   const [search, setSearch] = useState("");
 
   function updateSection(id: string, updated: KPISection) {
-    setSections((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    setSections((prev) => { const next = prev.map((s) => (s.id === id ? updated : s)); setDoc(scorecardRef, { sections: next }); return next; });
   }
 
   function deleteSection(id: string) {
     if (!confirm("Delete this section and all its KPIs?")) return;
-    setSections((prev) => prev.filter((s) => s.id !== id));
+    setSections((prev) => { const next = prev.filter((s) => s.id !== id); setDoc(scorecardRef, { sections: next }); return next; });
   }
 
   function addSection() {
     const title = prompt("Section name:");
     if (!title) return;
-    setSections((prev) => [
-      ...prev,
-      { id: Date.now().toString(), title, kpis: [], collapsed: false },
-    ]);
+    setSections((prev) => { const next = [...prev, { id: Date.now().toString(), title, kpis: [], collapsed: false }]; setDoc(scorecardRef, { sections: next }); return next; });
   }
+
+  if (!loaded) return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontSize: 14, color: "#888" }}>Loading…</div>;
 
   const filtered = sections.map((s) => ({
     ...s,
