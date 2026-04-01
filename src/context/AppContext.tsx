@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
 export interface User {
@@ -83,6 +83,33 @@ const todosRef     = doc(db, "app-data", "todos");
 const issuesRef    = doc(db, "app-data", "issues");
 const headlinesRef = doc(db, "app-data", "headlines");
 
+// One-time migration: push localStorage data to Firestore if Firestore is empty
+async function migrateFromLocalStorage() {
+  if (localStorage.getItem("ninety-migrated-to-firestore")) return;
+  const migrations: Array<{ ref: ReturnType<typeof doc>; key: string; field: string }> = [
+    { ref: todosRef,     key: "ninety-todos",     field: "items" },
+    { ref: issuesRef,    key: "ninety-issues",     field: "items" },
+    { ref: headlinesRef, key: "ninety-headlines",  field: "items" },
+  ];
+  for (const { ref, key, field } of migrations) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const localData = JSON.parse(raw);
+      if (!Array.isArray(localData) || localData.length === 0) continue;
+      const snap = await getDoc(ref);
+      const cloudItems = snap.exists() ? (snap.data()[field] ?? []) : [];
+      if (cloudItems.length === 0) {
+        await setDoc(ref, { [field]: localData });
+        console.log(`Migrated ${localData.length} items from ${key} to Firestore`);
+      }
+    } catch (e) {
+      console.warn("Migration failed for", key, e);
+    }
+  }
+  localStorage.setItem("ninety-migrated-to-firestore", "1");
+}
+
 export function AppProvider({ children, username }: { children: ReactNode; username: string }) {
   const currentUser = MOCK_USERS.find((u) => u.id === USERNAME_TO_ID[username]) ?? null;
 
@@ -90,6 +117,9 @@ export function AppProvider({ children, username }: { children: ReactNode; usern
   const [issues,    setIssues]    = useState<IssueItem[]>([]);
   const [headlines, setHeadlines] = useState<HeadlineItem[]>([]);
   const [loaded,    setLoaded]    = useState({ todos: false, issues: false, headlines: false });
+
+  // Run migration once on first load
+  useEffect(() => { migrateFromLocalStorage(); }, []);
 
   // Real-time Firestore listeners
   useEffect(() => {

@@ -3,16 +3,37 @@ import type { CSSProperties } from "react";
 import KPISectionComponent from "./scorecard/KPISection";
 import { generateWeeks } from "./scorecard/utils";
 import type { KPISection } from "./scorecard/types";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
 const WEEKS = generateWeeks(13);
 const TABS = ["Weekly", "Monthly", "Quarterly", "Annual"] as const;
 const scorecardRef = doc(db, "app-data", "scorecard");
 
+async function migrateScorecardFromLocalStorage() {
+  if (localStorage.getItem("ninety-migrated-scorecard")) return;
+  try {
+    const raw = localStorage.getItem("ninety-scorecard-sections");
+    if (!raw) return;
+    const localData = JSON.parse(raw);
+    if (!Array.isArray(localData) || localData.length === 0) return;
+    const snap = await getDoc(scorecardRef);
+    const cloudSections = snap.exists() ? (snap.data().sections ?? []) : [];
+    if (cloudSections.length === 0) {
+      await setDoc(scorecardRef, { sections: localData });
+      console.log("Migrated scorecard sections to Firestore");
+    }
+  } catch (e) {
+    console.warn("Scorecard migration failed", e);
+  }
+  localStorage.setItem("ninety-migrated-scorecard", "1");
+}
+
 export default function Scorecard() {
   const [sections, setSections] = useState<KPISection[]>([]);
   const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => { migrateScorecardFromLocalStorage(); }, []);
 
   useEffect(() => {
     return onSnapshot(scorecardRef, (snap) => {

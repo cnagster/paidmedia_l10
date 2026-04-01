@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type { Objective, OKRUser } from "../okr/types";
 import ObjectiveCard from "../okr/ObjectiveCard";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 
 const OKR_USERS: OKRUser[] = [
@@ -126,10 +126,34 @@ type AllPeriods = Record<Period, Objective[]>;
 const EMPTY_PERIODS: AllPeriods = { "2026 Annual OKR": [], "Q1 OKR": [], "Q2 OKR": [], "Q3 OKR": [], "Q4 OKR": [] };
 const okrsRef = doc(db, "app-data", "okrs");
 
+async function migrateOKRsFromLocalStorage() {
+  if (localStorage.getItem("ninety-migrated-okrs")) return;
+  try {
+    const raw = localStorage.getItem("ninety-okr-all-periods");
+    if (!raw) return;
+    const localData = JSON.parse(raw);
+    if (!localData || typeof localData !== "object") return;
+    const hasData = Object.values(localData).some((v) => Array.isArray(v) && (v as unknown[]).length > 0);
+    if (!hasData) return;
+    const snap = await getDoc(okrsRef);
+    const cloudPeriods = snap.exists() ? snap.data().periods : null;
+    const cloudHasData = cloudPeriods && Object.values(cloudPeriods).some((v) => Array.isArray(v) && (v as unknown[]).length > 0);
+    if (!cloudHasData) {
+      await setDoc(okrsRef, { periods: localData });
+      console.log("Migrated OKRs to Firestore");
+    }
+  } catch (e) {
+    console.warn("OKR migration failed", e);
+  }
+  localStorage.setItem("ninety-migrated-okrs", "1");
+}
+
 export default function OKRs() {
   const [allPeriods, setAllPeriods] = useState<AllPeriods>(EMPTY_PERIODS);
   const [activePeriod, setActivePeriod] = useState<Period>("2026 Annual OKR");
   const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => { migrateOKRsFromLocalStorage(); }, []);
 
   useEffect(() => {
     return onSnapshot(okrsRef, (snap) => {
