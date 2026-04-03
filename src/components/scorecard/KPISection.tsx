@@ -284,7 +284,10 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
                     ? {
                         ...kpi,
                         weeklyValues: Object.fromEntries(
-                          weeks.map((w) => [w.key, evaluateFormula(kpi.formula!, w.key, section.kpis)])
+                          weeks.map((w) => {
+                            const result = evaluateFormula(kpi.formula!, w.key, section.kpis);
+                            return [w.key, result != null && kpi.valueType === "percentage" ? result * 100 : result];
+                          })
                         ),
                       }
                     : kpi;
