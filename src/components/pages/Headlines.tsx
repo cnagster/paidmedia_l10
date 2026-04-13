@@ -110,7 +110,7 @@ function CreateHeadlineModal({ onClose }: { onClose: () => void }) {
 
 // ── Headline row ──────────────────────────────────────────────────────────────
 
-function HeadlineRow({ headline, isDragOver, onArchive, onDelete, onDragStart, onDragOver, onDrop, onDragEnd }: {
+function HeadlineRow({ headline, isDragOver, onArchive, onDelete, onDragStart, onDragOver, onDrop, onDragEnd, onUpdateTitle }: {
   headline: HeadlineItem;
   isDragOver: boolean;
   onArchive: () => void;
@@ -119,9 +119,12 @@ function HeadlineRow({ headline, isDragOver, onArchive, onDelete, onDragStart, o
   onDragOver: (e: React.DragEvent) => void;
   onDrop: () => void;
   onDragEnd: () => void;
+  onUpdateTitle: (title: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleVal, setTitleVal] = useState("");
 
   return (
     <div
@@ -152,12 +155,28 @@ function HeadlineRow({ headline, isDragOver, onArchive, onDelete, onDragStart, o
 
         {/* Title + description */}
         <div>
-          <div
-            onClick={() => setExpanded((v) => !v)}
-            style={{ fontSize: 14, fontWeight: 500, color: headline.archived ? "#aaa" : "#222", cursor: "pointer", textDecoration: headline.archived ? "line-through" : "none" }}
-          >
-            {headline.title}
-          </div>
+          {editingTitle ? (
+            <input
+              autoFocus
+              value={titleVal}
+              onChange={(e) => setTitleVal(e.target.value)}
+              onBlur={() => { if (titleVal.trim()) onUpdateTitle(titleVal.trim()); setEditingTitle(false); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { if (titleVal.trim()) onUpdateTitle(titleVal.trim()); setEditingTitle(false); }
+                if (e.key === "Escape") setEditingTitle(false);
+              }}
+              style={{ width: "100%", border: "1px solid #5b9ea6", borderRadius: 4, padding: "2px 6px", fontSize: 14, fontWeight: 500, outline: "none", color: "#222", boxSizing: "border-box" }}
+            />
+          ) : (
+            <div
+              onClick={() => setExpanded((v) => !v)}
+              onDoubleClick={() => { setEditingTitle(true); setTitleVal(headline.title); }}
+              title="Double-click to edit"
+              style={{ fontSize: 14, fontWeight: 500, color: headline.archived ? "#aaa" : "#222", cursor: "pointer", textDecoration: headline.archived ? "line-through" : "none" }}
+            >
+              {headline.title}
+            </div>
+          )}
           {expanded && headline.description && (
             <div style={{ marginTop: 6, fontSize: 13, color: "#666", lineHeight: 1.5 }}>{headline.description}</div>
           )}
@@ -202,7 +221,7 @@ function HeadlineRow({ headline, isDragOver, onArchive, onDelete, onDragStart, o
 // ── Main Headlines page ───────────────────────────────────────────────────────
 
 export default function Headlines() {
-  const { headlines, users, archiveHeadline, deleteHeadline, reorderHeadlines } = useApp();
+  const { headlines, users, archiveHeadline, deleteHeadline, reorderHeadlines, updateHeadline } = useApp();
   const [showArchive, setShowArchive] = useState(false);
   const [search,      setSearch]      = useState("");
   const [showModal,   setShowModal]   = useState(false);
@@ -304,6 +323,7 @@ export default function Headlines() {
               onDragOver={(e) => { e.preventDefault(); setDragOverId(h.id); }}
               onDrop={() => { if (dragId.current && dragId.current !== h.id) reorderHeadlines(dragId.current, h.id); dragId.current = null; setDragOverId(null); }}
               onDragEnd={() => { dragId.current = null; setDragOverId(null); }}
+              onUpdateTitle={(title) => updateHeadline(h.id, { title })}
             />
           ))
         )}

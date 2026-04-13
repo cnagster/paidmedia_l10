@@ -216,6 +216,7 @@ export default function Todos() {
               onDelete={() => deleteTodo(todo.id)}
               onUpdateDue={(dueBy) => updateTodo(todo.id, { dueBy })}
               onUpdateAssignees={(assignees) => updateTodo(todo.id, { assignees })}
+              onUpdateTitle={(title) => updateTodo(todo.id, { title })}
             />
           ))
         )}
@@ -298,16 +299,19 @@ export default function Todos() {
   );
 }
 
-function TodoRow({ todo, allUsers, onToggle, onDelete, onUpdateDue, onUpdateAssignees }: {
+function TodoRow({ todo, allUsers, onToggle, onDelete, onUpdateDue, onUpdateAssignees, onUpdateTitle }: {
   todo: TodoItem;
   allUsers: User[];
   onToggle: () => void;
   onDelete: () => void;
   onUpdateDue: (dueBy: string) => void;
   onUpdateAssignees: (assignees: User[]) => void;
+  onUpdateTitle: (title: string) => void;
 }) {
   const [showCal,     setShowCal]     = useState(false);
   const [showPicker,  setShowPicker]  = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleVal, setTitleVal] = useState("");
   const dateRef  = useRef<HTMLButtonElement>(null);
   const ownerRef = useRef<HTMLButtonElement>(null);
 
@@ -343,9 +347,27 @@ function TodoRow({ todo, allUsers, onToggle, onDelete, onUpdateDue, onUpdateAssi
         </button>
 
         {/* Title */}
-        <span style={{ fontSize: 14, color: todo.done ? "#aaa" : "#333", textDecoration: todo.done ? "line-through" : "none", paddingRight: 16 }}>
-          {todo.title}
-        </span>
+        {editingTitle ? (
+          <input
+            autoFocus
+            value={titleVal}
+            onChange={(e) => setTitleVal(e.target.value)}
+            onBlur={() => { if (titleVal.trim()) onUpdateTitle(titleVal.trim()); setEditingTitle(false); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { if (titleVal.trim()) onUpdateTitle(titleVal.trim()); setEditingTitle(false); }
+              if (e.key === "Escape") setEditingTitle(false);
+            }}
+            style={{ border: "1px solid #5b9ea6", borderRadius: 4, padding: "2px 6px", fontSize: 14, outline: "none", color: "#333", marginRight: 16, width: "100%", boxSizing: "border-box" }}
+          />
+        ) : (
+          <span
+            onDoubleClick={() => { setEditingTitle(true); setTitleVal(todo.title); }}
+            title="Double-click to edit"
+            style={{ fontSize: 14, color: todo.done ? "#aaa" : "#333", textDecoration: todo.done ? "line-through" : "none", paddingRight: 16, cursor: "default" }}
+          >
+            {todo.title}
+          </span>
+        )}
 
         {/* Due By — clickable */}
         <button

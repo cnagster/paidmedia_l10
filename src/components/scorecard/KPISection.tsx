@@ -126,13 +126,15 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
   }
 
   function commitGoal(id: string) {
+    const num = parseFloat(tempGoalVal.replace(/[$,%\s]/g, ""));
+    const goalUpdates: Partial<KPI> = { goalOperator: tempGoalOp, valueType: tempValueType };
+    if (!isNaN(num)) goalUpdates.goalValue = num;
     if (goalMode === "formula") {
-      updateKPI(id, { formula: tempFormula.trim() || undefined, valueType: tempValueType });
+      goalUpdates.formula = tempFormula.trim() || undefined;
     } else {
-      const num = parseFloat(tempGoalVal.replace(/[$,%\s]/g, ""));
-      if (!isNaN(num)) updateKPI(id, { goalOperator: tempGoalOp, goalValue: num, valueType: tempValueType, formula: undefined });
-      else if (tempGoalVal.trim() === "") updateKPI(id, { goalOperator: tempGoalOp, valueType: tempValueType, formula: undefined });
+      goalUpdates.formula = undefined;
     }
+    updateKPI(id, goalUpdates);
     setEditingGoal(null);
   }
 
@@ -454,6 +456,24 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
                               </>
                             ) : (
                               <>
+                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                  <select
+                                    value={tempGoalOp}
+                                    onChange={(e) => setTempGoalOp(e.target.value as GoalOperator)}
+                                    style={{ border: "1px solid #5b9ea6", borderRadius: 3, fontSize: 12, padding: "2px 3px", outline: "none", background: "#fff" }}
+                                  >
+                                    {([">=", "<=", ">", "<", "="] as GoalOperator[]).map((op) => (
+                                      <option key={op} value={op}>{op}</option>
+                                    ))}
+                                  </select>
+                                  <input
+                                    value={tempGoalVal}
+                                    onChange={(e) => setTempGoalVal(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === "Enter") commitGoal(kpi.id); if (e.key === "Escape") setEditingGoal(null); }}
+                                    placeholder="goal"
+                                    style={{ width: 56, border: "1px solid #5b9ea6", borderRadius: 3, padding: "2px 4px", fontSize: 13, outline: "none" }}
+                                  />
+                                </div>
                                 <input
                                   autoFocus
                                   value={tempFormula}
@@ -489,7 +509,13 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
                           </div>
                         ) : (
                           kpi.formula
-                            ? <span style={{ fontSize: 11, color: "#5b9ea6", fontStyle: "italic" }} title={kpi.formula}>ƒ {kpi.formula.length > 20 ? kpi.formula.slice(0, 20) + "…" : kpi.formula}</span>
+                            ? <span title={`ƒ ${kpi.formula}`}>
+                                <span style={{ fontSize: 10, color: "#5b9ea6", fontWeight: 600, marginRight: 4 }}>ƒ</span>
+                                {kpi.goalValue === 0 && kpi.valueType === "number"
+                                  ? <span style={{ color: "#bbb", fontSize: 12 }}>Set goal…</span>
+                                  : <span style={{ fontSize: 13, color: "#555" }}>{formatGoal(kpi.goalOperator, kpi.goalValue, kpi.valueType)}</span>
+                                }
+                              </span>
                             : kpi.goalValue === 0 && kpi.valueType === "number"
                               ? <span style={{ color: "#bbb", fontSize: 12 }}>Set goal…</span>
                               : formatGoal(kpi.goalOperator, kpi.goalValue, kpi.valueType)

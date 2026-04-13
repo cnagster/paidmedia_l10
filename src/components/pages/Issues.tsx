@@ -54,14 +54,17 @@ interface SectionProps {
   onReorder: (fromId: string, toId: string) => void;
   onAdd: () => void;
   onCreateTodoFromIssue: (issueTitle: string) => void;
+  onUpdateTitle: (id: string, title: string) => void;
 }
 
-function IssueSection({ label, issues, allUsers, onResolve, onDelete, onUpdateOwner, onReorder, onAdd, onCreateTodoFromIssue }: SectionProps) {
+function IssueSection({ label, issues, allUsers, onResolve, onDelete, onUpdateOwner, onReorder, onAdd, onCreateTodoFromIssue, onUpdateTitle }: SectionProps) {
   const [page, setPage]       = useState(1);
   const [perPage, setPerPage] = useState(50);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [pickerFor, setPickerFor]   = useState<string | null>(null);
   const [ctxMenu, setCtxMenu]       = useState<{ x: number; y: number; issueTitle: string } | null>(null);
+  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
+  const [editingTitleVal, setEditingTitleVal] = useState("");
   const ownerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const dragId    = useRef<string | null>(null);
 
@@ -153,10 +156,31 @@ function IssueSection({ label, issues, allUsers, onResolve, onDelete, onUpdateOw
               </button>
 
               {/* Number + Title */}
-              <span style={{ fontSize: 14, color: issue.resolved ? "#aaa" : "#333", textDecoration: issue.resolved ? "line-through" : "none" }}>
-                <span style={{ fontWeight: 600, marginRight: 6 }}>{globalIdx + 1}.</span>
-                {issue.title}
-              </span>
+              {editingTitleId === issue.id ? (
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <span style={{ fontWeight: 600, marginRight: 6, fontSize: 14, color: "#333" }}>{globalIdx + 1}.</span>
+                  <input
+                    autoFocus
+                    value={editingTitleVal}
+                    onChange={(e) => setEditingTitleVal(e.target.value)}
+                    onBlur={() => { if (editingTitleVal.trim()) onUpdateTitle(issue.id, editingTitleVal.trim()); setEditingTitleId(null); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { if (editingTitleVal.trim()) onUpdateTitle(issue.id, editingTitleVal.trim()); setEditingTitleId(null); }
+                      if (e.key === "Escape") setEditingTitleId(null);
+                    }}
+                    style={{ flex: 1, border: "1px solid #5b9ea6", borderRadius: 4, padding: "2px 6px", fontSize: 14, outline: "none", color: "#333" }}
+                  />
+                </div>
+              ) : (
+                <span
+                  onDoubleClick={() => { setEditingTitleId(issue.id); setEditingTitleVal(issue.title); }}
+                  title="Double-click to edit"
+                  style={{ fontSize: 14, color: issue.resolved ? "#aaa" : "#333", textDecoration: issue.resolved ? "line-through" : "none", cursor: "default" }}
+                >
+                  <span style={{ fontWeight: 600, marginRight: 6 }}>{globalIdx + 1}.</span>
+                  {issue.title}
+                </span>
+              )}
 
               {/* Created */}
               <span style={{ fontSize: 13, color: "#888" }}>{issue.createdAt || "—"}</span>
@@ -334,6 +358,7 @@ export default function Issues() {
           onReorder={(fromId, toId) => reorderIssues("short", fromId, toId)}
           onAdd={() => handleAdd("short")}
           onCreateTodoFromIssue={(title) => { setModalType("todo"); setModalTitle(title); setShowModal(true); }}
+          onUpdateTitle={(id, title) => updateIssue(id, { title })}
         />
         {addingFor === "short" && (
           <InlineAdd value={inlineTitle} onChange={setInlineTitle} onSubmit={submitInline} onCancel={() => setAddingFor(null)} />
@@ -349,6 +374,7 @@ export default function Issues() {
           onReorder={(fromId, toId) => reorderIssues("long", fromId, toId)}
           onAdd={() => handleAdd("long")}
           onCreateTodoFromIssue={(title) => { setModalType("todo"); setModalTitle(title); setShowModal(true); }}
+          onUpdateTitle={(id, title) => updateIssue(id, { title })}
         />
         {addingFor === "long" && (
           <InlineAdd value={inlineTitle} onChange={setInlineTitle} onSubmit={submitInline} onCancel={() => setAddingFor(null)} />
