@@ -3,6 +3,7 @@ import { useApp } from "../../context/AppContext";
 import type { HeadlineItem, User } from "../../context/AppContext";
 import UserPicker from "../ui/UserPicker";
 
+
 function Avatar({ user, size = 30 }: { user: User; size?: number }) {
   return (
     <div style={{ width: size, height: size, borderRadius: "50%", background: user.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.36, fontWeight: 700, flexShrink: 0 }}>
@@ -110,7 +111,7 @@ function CreateHeadlineModal({ onClose }: { onClose: () => void }) {
 
 // ── Headline row ──────────────────────────────────────────────────────────────
 
-function HeadlineRow({ headline, isDragOver, onArchive, onDelete, onDragStart, onDragOver, onDrop, onDragEnd, onUpdateTitle }: {
+function HeadlineRow({ headline, isDragOver, onArchive, onDelete, onDragStart, onDragOver, onDrop, onDragEnd, onUpdateTitle, onUpdateAuthor, allUsers }: {
   headline: HeadlineItem;
   isDragOver: boolean;
   onArchive: () => void;
@@ -120,11 +121,15 @@ function HeadlineRow({ headline, isDragOver, onArchive, onDelete, onDragStart, o
   onDrop: () => void;
   onDragEnd: () => void;
   onUpdateTitle: (title: string) => void;
+  onUpdateAuthor: (author: User | null) => void;
+  allUsers: User[];
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleVal, setTitleVal] = useState("");
+  const [showPicker, setShowPicker] = useState(false);
+  const avatarRef = useRef<HTMLButtonElement>(null);
 
   return (
     <div
@@ -145,13 +150,18 @@ function HeadlineRow({ headline, isDragOver, onArchive, onDelete, onDragStart, o
           {headline.archived ? "✓" : ""}
         </button>
 
-        {/* Author avatar */}
-        <div>
+        {/* Author avatar — clickable */}
+        <button
+          ref={avatarRef}
+          onClick={() => setShowPicker((v) => !v)}
+          title="Set author"
+          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", borderRadius: "50%" }}
+        >
           {headline.author
             ? <Avatar user={headline.author} size={30} />
             : <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#eee", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#bbb" }}>?</div>
           }
-        </div>
+        </button>
 
         {/* Title + description */}
         <div>
@@ -214,6 +224,15 @@ function HeadlineRow({ headline, isDragOver, onArchive, onDelete, onDragStart, o
           )}
         </div>
       </div>
+      {showPicker && (
+        <UserPicker
+          users={allUsers}
+          selectedIds={headline.author ? [headline.author.id] : []}
+          anchorEl={avatarRef.current}
+          onChange={(ids) => { onUpdateAuthor(allUsers.find((u) => u.id === ids[0]) ?? null); setShowPicker(false); }}
+          onClose={() => setShowPicker(false)}
+        />
+      )}
     </div>
   );
 }
@@ -324,6 +343,8 @@ export default function Headlines() {
               onDrop={() => { if (dragId.current && dragId.current !== h.id) reorderHeadlines(dragId.current, h.id); dragId.current = null; setDragOverId(null); }}
               onDragEnd={() => { dragId.current = null; setDragOverId(null); }}
               onUpdateTitle={(title) => updateHeadline(h.id, { title })}
+              onUpdateAuthor={(author) => updateHeadline(h.id, { author })}
+              allUsers={users}
             />
           ))
         )}
