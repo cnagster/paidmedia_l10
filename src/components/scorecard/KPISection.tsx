@@ -20,13 +20,14 @@ const TREND_STYLE = {
 } as const;
 
 // Column widths & sticky left offsets
-const W = { cb: 40, trend: 48, title: 240, goal: 148, avg: 138, week: 138 };
+const W = { drag: 28, cb: 40, trend: 48, title: 240, goal: 148, avg: 138, week: 138 };
 const L = {
-  cb:    0,
-  trend: W.cb,
-  title: W.cb + W.trend,
-  goal:  W.cb + W.trend + W.title,
-  avg:   W.cb + W.trend + W.title + W.goal,
+  drag:  0,
+  cb:    W.drag,
+  trend: W.drag + W.cb,
+  title: W.drag + W.cb + W.trend,
+  goal:  W.drag + W.cb + W.trend + W.title,
+  avg:   W.drag + W.cb + W.trend + W.title + W.goal,
 };
 const FIXED_WIDTH = L.avg + W.avg;
 
@@ -74,6 +75,8 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
   const [tempFormula, setTempFormula] = useState("");
   const [editingCell, setEditingCell] = useState<{ kpiId: string; weekKey: string } | null>(null);
   const [tempValue, setTempValue] = useState("");
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   function push(changes: Partial<KPISectionType>) {
     onUpdate({ ...section, title: sectionTitle, ...changes });
@@ -103,6 +106,14 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
         },
       ],
     });
+  }
+
+  function reorderKPIs(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex) return;
+    const reordered = [...section.kpis];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+    push({ kpis: reordered });
   }
 
   function openGoalEdit(kpi: KPI) {
@@ -241,6 +252,7 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
             >
               <thead>
                 <tr style={{ background: "#fafbfc" }}>
+                  <th style={stickyCell(L.drag, W.drag, { background: "#fafbfc" })} />
                   <th style={stickyCell(L.cb, W.cb, { background: "#fafbfc" })}>
                     <input type="checkbox" style={{ accentColor: "#5b9ea6" }} />
                   </th>
@@ -295,8 +307,33 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
                   const avg = getAverage(resolvedKPI, weeks);
                   const ti = TREND_STYLE[trend];
 
+                  const kpiIndex = section.kpis.indexOf(kpi);
+
                   return (
-                    <tr key={kpi.id}>
+                    <tr
+                      key={kpi.id}
+                      style={{
+                        opacity: dragIndex === kpiIndex ? 0.4 : 1,
+                        borderTop: dragOverIndex === kpiIndex ? "2px solid #5b9ea6" : undefined,
+                      }}
+                      onDragOver={(e) => { e.preventDefault(); setDragOverIndex(kpiIndex); }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (dragIndex != null) reorderKPIs(dragIndex, kpiIndex);
+                        setDragIndex(null);
+                        setDragOverIndex(null);
+                      }}
+                    >
+                      {/* Drag handle */}
+                      <td
+                        draggable
+                        onDragStart={() => setDragIndex(kpiIndex)}
+                        onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
+                        style={stickyCell(L.drag, W.drag, { cursor: "grab", textAlign: "center", color: "#ccc", fontSize: 14, userSelect: "none" })}
+                        title="Drag to reorder"
+                      >
+                        ⠿
+                      </td>
                       {/* Checkbox */}
                       <td style={stickyCell(L.cb, W.cb, { textAlign: "center" })}>
                         <input type="checkbox" style={{ accentColor: "#5b9ea6" }} />
