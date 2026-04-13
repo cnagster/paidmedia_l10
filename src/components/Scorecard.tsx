@@ -46,7 +46,7 @@ export default function Scorecard() {
   const [search, setSearch] = useState("");
 
   function updateSection(id: string, updated: KPISection) {
-    setSections((prev) => { const next = prev.map((s) => (s.id === id ? updated : s)); setDoc(scorecardRef, { sections: next }); return next; });
+    setSections((prev) => { const next = prev.map((s) => (s.id === id ? updated : s)); setDoc(scorecardRef, JSON.parse(JSON.stringify({ sections: next }))); return next; });
   }
 
   function deleteSection(id: string) {
