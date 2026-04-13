@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
-import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, getDoc, runTransaction } from "firebase/firestore";
 import { db } from "../firebase";
 
 export interface User {
@@ -161,37 +161,88 @@ export function AppProvider({ children, username }: { children: ReactNode; usern
     );
   }, []);
 
+  const allLoaded = loaded.todos && loaded.issues && loaded.headlines;
+
   // ── Todos ──────────────────────────────────────────────
   function addTodo(todo: Omit<TodoItem, "id">) {
+    if (!allLoaded) return;
     const newItem = { ...todo, id: Date.now().toString() };
-    setTodos((prev) => { const next = [newItem, ...prev]; setDoc(todosRef, { items: next }); return next; });
+    setTodos((prev) => [newItem, ...prev]);
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(todosRef);
+      const current: TodoItem[] = snap.exists() ? (snap.data().items ?? []) : [];
+      tx.set(todosRef, { items: [newItem, ...current] });
+    }).catch((e) => console.error("addTodo transaction failed:", e));
   }
   function updateTodo(id: string, changes: Partial<TodoItem>) {
-    setTodos((prev) => { const next = prev.map((t) => (t.id === id ? { ...t, ...changes } : t)); setDoc(todosRef, { items: next }); return next; });
+    if (!allLoaded) return;
+    setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, ...changes } : t)));
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(todosRef);
+      const current: TodoItem[] = snap.exists() ? (snap.data().items ?? []) : [];
+      tx.set(todosRef, { items: current.map((t) => (t.id === id ? { ...t, ...changes } : t)) });
+    }).catch((e) => console.error("updateTodo transaction failed:", e));
   }
   function deleteTodo(id: string) {
-    setTodos((prev) => { const next = prev.filter((t) => t.id !== id); setDoc(todosRef, { items: next }); return next; });
+    if (!allLoaded) return;
+    setTodos((prev) => prev.filter((t) => t.id !== id));
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(todosRef);
+      const current: TodoItem[] = snap.exists() ? (snap.data().items ?? []) : [];
+      tx.set(todosRef, { items: current.filter((t) => t.id !== id) });
+    }).catch((e) => console.error("deleteTodo transaction failed:", e));
   }
   function toggleTodo(id: string) {
-    setTodos((prev) => { const next = prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)); setDoc(todosRef, { items: next }); return next; });
+    if (!allLoaded) return;
+    setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(todosRef);
+      const current: TodoItem[] = snap.exists() ? (snap.data().items ?? []) : [];
+      tx.set(todosRef, { items: current.map((t) => (t.id === id ? { ...t, done: !t.done } : t)) });
+    }).catch((e) => console.error("toggleTodo transaction failed:", e));
   }
 
   // ── Issues ─────────────────────────────────────────────
   function addIssue(issue: Omit<IssueItem, "id" | "createdAt">) {
+    if (!allLoaded) return;
     const createdAt = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
     const newItem = { ...issue, id: Date.now().toString(), createdAt };
-    setIssues((prev) => { const next = [...prev, newItem]; setDoc(issuesRef, { items: next }); return next; });
+    setIssues((prev) => [...prev, newItem]);
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(issuesRef);
+      const current: IssueItem[] = snap.exists() ? (snap.data().items ?? []) : [];
+      tx.set(issuesRef, { items: [...current, newItem] });
+    }).catch((e) => console.error("addIssue transaction failed:", e));
   }
   function updateIssue(id: string, changes: Partial<IssueItem>) {
-    setIssues((prev) => { const next = prev.map((i) => (i.id === id ? { ...i, ...changes } : i)); setDoc(issuesRef, { items: next }); return next; });
+    if (!allLoaded) return;
+    setIssues((prev) => prev.map((i) => (i.id === id ? { ...i, ...changes } : i)));
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(issuesRef);
+      const current: IssueItem[] = snap.exists() ? (snap.data().items ?? []) : [];
+      tx.set(issuesRef, { items: current.map((i) => (i.id === id ? { ...i, ...changes } : i)) });
+    }).catch((e) => console.error("updateIssue transaction failed:", e));
   }
   function deleteIssue(id: string) {
-    setIssues((prev) => { const next = prev.filter((i) => i.id !== id); setDoc(issuesRef, { items: next }); return next; });
+    if (!allLoaded) return;
+    setIssues((prev) => prev.filter((i) => i.id !== id));
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(issuesRef);
+      const current: IssueItem[] = snap.exists() ? (snap.data().items ?? []) : [];
+      tx.set(issuesRef, { items: current.filter((i) => i.id !== id) });
+    }).catch((e) => console.error("deleteIssue transaction failed:", e));
   }
   function resolveIssue(id: string) {
-    setIssues((prev) => { const next = prev.map((i) => (i.id === id ? { ...i, resolved: !i.resolved } : i)); setDoc(issuesRef, { items: next }); return next; });
+    if (!allLoaded) return;
+    setIssues((prev) => prev.map((i) => (i.id === id ? { ...i, resolved: !i.resolved } : i)));
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(issuesRef);
+      const current: IssueItem[] = snap.exists() ? (snap.data().items ?? []) : [];
+      tx.set(issuesRef, { items: current.map((i) => (i.id === id ? { ...i, resolved: !i.resolved } : i)) });
+    }).catch((e) => console.error("resolveIssue transaction failed:", e));
   }
   function reorderIssues(term: "short" | "long", fromId: string, toId: string) {
+    if (!allLoaded) return;
     setIssues((prev) => {
       const group = prev.filter((i) => i.term === term);
       const rest  = prev.filter((i) => i.term !== term);
@@ -201,28 +252,64 @@ export function AppProvider({ children, username }: { children: ReactNode; usern
       const next = [...group];
       const [moved] = next.splice(fromIdx, 1);
       next.splice(toIdx, 0, moved);
-      const result = [...rest, ...next];
-      setDoc(issuesRef, { items: result });
-      return result;
+      return [...rest, ...next];
     });
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(issuesRef);
+      const current: IssueItem[] = snap.exists() ? (snap.data().items ?? []) : [];
+      const group = current.filter((i) => i.term === term);
+      const rest  = current.filter((i) => i.term !== term);
+      const fromIdx = group.findIndex((i) => i.id === fromId);
+      const toIdx   = group.findIndex((i) => i.id === toId);
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+      const next = [...group];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      tx.set(issuesRef, { items: [...rest, ...next] });
+    }).catch((e) => console.error("reorderIssues transaction failed:", e));
   }
 
   // ── Headlines ──────────────────────────────────────────
   function addHeadline(headline: Omit<HeadlineItem, "id" | "createdAt">) {
+    if (!allLoaded) return;
     const createdAt = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
     const newItem = { ...headline, id: Date.now().toString(), createdAt };
-    setHeadlines((prev) => { const next = [newItem, ...prev]; setDoc(headlinesRef, { items: next }); return next; });
+    setHeadlines((prev) => [newItem, ...prev]);
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(headlinesRef);
+      const current: HeadlineItem[] = snap.exists() ? (snap.data().items ?? []) : [];
+      tx.set(headlinesRef, { items: [newItem, ...current] });
+    }).catch((e) => console.error("addHeadline transaction failed:", e));
   }
   function updateHeadline(id: string, changes: Partial<HeadlineItem>) {
-    setHeadlines((prev) => { const next = prev.map((h) => (h.id === id ? { ...h, ...changes } : h)); setDoc(headlinesRef, { items: next }); return next; });
+    if (!allLoaded) return;
+    setHeadlines((prev) => prev.map((h) => (h.id === id ? { ...h, ...changes } : h)));
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(headlinesRef);
+      const current: HeadlineItem[] = snap.exists() ? (snap.data().items ?? []) : [];
+      tx.set(headlinesRef, { items: current.map((h) => (h.id === id ? { ...h, ...changes } : h)) });
+    }).catch((e) => console.error("updateHeadline transaction failed:", e));
   }
   function deleteHeadline(id: string) {
-    setHeadlines((prev) => { const next = prev.filter((h) => h.id !== id); setDoc(headlinesRef, { items: next }); return next; });
+    if (!allLoaded) return;
+    setHeadlines((prev) => prev.filter((h) => h.id !== id));
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(headlinesRef);
+      const current: HeadlineItem[] = snap.exists() ? (snap.data().items ?? []) : [];
+      tx.set(headlinesRef, { items: current.filter((h) => h.id !== id) });
+    }).catch((e) => console.error("deleteHeadline transaction failed:", e));
   }
   function archiveHeadline(id: string) {
-    setHeadlines((prev) => { const next = prev.map((h) => (h.id === id ? { ...h, archived: !h.archived } : h)); setDoc(headlinesRef, { items: next }); return next; });
+    if (!allLoaded) return;
+    setHeadlines((prev) => prev.map((h) => (h.id === id ? { ...h, archived: !h.archived } : h)));
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(headlinesRef);
+      const current: HeadlineItem[] = snap.exists() ? (snap.data().items ?? []) : [];
+      tx.set(headlinesRef, { items: current.map((h) => (h.id === id ? { ...h, archived: !h.archived } : h)) });
+    }).catch((e) => console.error("archiveHeadline transaction failed:", e));
   }
   function reorderHeadlines(fromId: string, toId: string) {
+    if (!allLoaded) return;
     setHeadlines((prev) => {
       const fromIdx = prev.findIndex((h) => h.id === fromId);
       const toIdx   = prev.findIndex((h) => h.id === toId);
@@ -230,9 +317,19 @@ export function AppProvider({ children, username }: { children: ReactNode; usern
       const next = [...prev];
       const [moved] = next.splice(fromIdx, 1);
       next.splice(toIdx, 0, moved);
-      setDoc(headlinesRef, { items: next });
       return next;
     });
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(headlinesRef);
+      const current: HeadlineItem[] = snap.exists() ? (snap.data().items ?? []) : [];
+      const fromIdx = current.findIndex((h) => h.id === fromId);
+      const toIdx   = current.findIndex((h) => h.id === toId);
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+      const next = [...current];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      tx.set(headlinesRef, { items: next });
+    }).catch((e) => console.error("reorderHeadlines transaction failed:", e));
   }
 
   if (!loaded.todos || !loaded.issues || !loaded.headlines) {

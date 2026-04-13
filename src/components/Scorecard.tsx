@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import KPISectionComponent from "./scorecard/KPISection";
 import { generateWeeks } from "./scorecard/utils";
 import type { KPISection } from "./scorecard/types";
-import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, getDoc, runTransaction } from "firebase/firestore";
 import { db } from "../firebase";
 
 const WEEKS = generateWeeks(13);
@@ -46,18 +46,39 @@ export default function Scorecard() {
   const [search, setSearch] = useState("");
 
   function updateSection(id: string, updated: KPISection) {
-    setSections((prev) => { const next = prev.map((s) => (s.id === id ? updated : s)); setDoc(scorecardRef, JSON.parse(JSON.stringify({ sections: next }))); return next; });
+    if (!loaded) return;
+    setSections((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(scorecardRef);
+      const current: KPISection[] = snap.exists() ? (snap.data().sections ?? []) : [];
+      const next = current.map((s) => (s.id === id ? { ...s, ...updated } : s));
+      tx.set(scorecardRef, JSON.parse(JSON.stringify({ sections: next })));
+    }).catch((e) => console.error("updateSection transaction failed:", e));
   }
 
   function deleteSection(id: string) {
+    if (!loaded) return;
     if (!confirm("Delete this section and all its KPIs?")) return;
-    setSections((prev) => { const next = prev.filter((s) => s.id !== id); setDoc(scorecardRef, { sections: next }); return next; });
+    setSections((prev) => prev.filter((s) => s.id !== id));
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(scorecardRef);
+      const current: KPISection[] = snap.exists() ? (snap.data().sections ?? []) : [];
+      const next = current.filter((s) => s.id !== id);
+      tx.set(scorecardRef, JSON.parse(JSON.stringify({ sections: next })));
+    }).catch((e) => console.error("deleteSection transaction failed:", e));
   }
 
   function addSection() {
+    if (!loaded) return;
     const title = prompt("Section name:");
     if (!title) return;
-    setSections((prev) => { const next = [...prev, { id: Date.now().toString(), title, kpis: [], collapsed: false }]; setDoc(scorecardRef, { sections: next }); return next; });
+    const newSection: KPISection = { id: Date.now().toString(), title, kpis: [], collapsed: false };
+    setSections((prev) => [...prev, newSection]);
+    runTransaction(db, async (tx) => {
+      const snap = await tx.get(scorecardRef);
+      const current: KPISection[] = snap.exists() ? (snap.data().sections ?? []) : [];
+      tx.set(scorecardRef, JSON.parse(JSON.stringify({ sections: [...current, newSection] })));
+    }).catch((e) => console.error("addSection transaction failed:", e));
   }
 
   if (!loaded) return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontSize: 14, color: "#888" }}>Loading…</div>;
