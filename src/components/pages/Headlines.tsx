@@ -2,6 +2,8 @@ import { useState, useRef } from "react";
 import { useApp } from "../../context/AppContext";
 import type { HeadlineItem, User } from "../../context/AppContext";
 import UserPicker from "../ui/UserPicker";
+import ContextMenu from "../scorecard/ContextMenu";
+import CreateItemModal from "../scorecard/CreateItemModal";
 
 
 function Avatar({ user, size = 30 }: { user: User; size?: number }) {
@@ -111,7 +113,7 @@ function CreateHeadlineModal({ onClose }: { onClose: () => void }) {
 
 // ── Headline row ──────────────────────────────────────────────────────────────
 
-function HeadlineRow({ headline, isDragOver, onArchive, onDelete, onDragStart, onDragOver, onDrop, onDragEnd, onUpdateTitle, onUpdateAuthor, allUsers }: {
+function HeadlineRow({ headline, isDragOver, onArchive, onDelete, onDragStart, onDragOver, onDrop, onDragEnd, onUpdateTitle, onUpdateAuthor, allUsers, onContextMenu }: {
   headline: HeadlineItem;
   isDragOver: boolean;
   onArchive: () => void;
@@ -123,6 +125,7 @@ function HeadlineRow({ headline, isDragOver, onArchive, onDelete, onDragStart, o
   onUpdateTitle: (title: string) => void;
   onUpdateAuthor: (author: User | null) => void;
   allUsers: User[];
+  onContextMenu: (e: React.MouseEvent, title: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -138,6 +141,7 @@ function HeadlineRow({ headline, isDragOver, onArchive, onDelete, onDragStart, o
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
+      onContextMenu={(e) => { e.preventDefault(); onContextMenu(e, headline.title); }}
       style={{ borderBottom: "1px solid #f5f5f5", padding: "14px 24px", background: "#fff", borderTop: isDragOver ? "2px solid #5b9ea6" : "2px solid transparent", cursor: "grab" }}
     >
       <div style={{ display: "grid", gridTemplateColumns: "28px 36px 1fr 90px 44px", alignItems: "center", gap: 12 }}>
@@ -245,6 +249,8 @@ export default function Headlines() {
   const [search,      setSearch]      = useState("");
   const [showModal,   setShowModal]   = useState(false);
   const [dragOverId,  setDragOverId]  = useState<string | null>(null);
+  const [ctxMenu,     setCtxMenu]     = useState<{ x: number; y: number; title: string } | null>(null);
+  const [createItem,  setCreateItem]  = useState<{ type: "todo" | "issue"; title: string } | null>(null);
   const dragId = useRef<string | null>(null);
 
   const filtered = headlines.filter((h) => {
@@ -345,6 +351,7 @@ export default function Headlines() {
               onUpdateTitle={(title) => updateHeadline(h.id, { title })}
               onUpdateAuthor={(author) => updateHeadline(h.id, { author })}
               allUsers={users}
+              onContextMenu={(e, title) => setCtxMenu({ x: e.clientX, y: e.clientY, title })}
             />
           ))
         )}
@@ -360,6 +367,24 @@ export default function Headlines() {
       </div>
 
       {showModal && <CreateHeadlineModal onClose={() => setShowModal(false)} />}
+
+      {ctxMenu && (
+        <ContextMenu
+          x={ctxMenu.x} y={ctxMenu.y}
+          onCreateTodo={() => { setCreateItem({ type: "todo", title: ctxMenu.title }); setCtxMenu(null); }}
+          onCreateIssue={() => { setCreateItem({ type: "issue", title: ctxMenu.title }); setCtxMenu(null); }}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
+
+      {createItem && (
+        <CreateItemModal
+          defaultType={createItem.type}
+          kpiTitle={createItem.title}
+          prefillDescription=""
+          onClose={() => setCreateItem(null)}
+        />
+      )}
     </div>
   );
 }
