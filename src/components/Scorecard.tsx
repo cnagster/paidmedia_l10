@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type { CSSProperties } from "react";
 import KPISectionComponent from "./scorecard/KPISection";
-import { generateWeeks } from "./scorecard/utils";
+import { generateWeeks, mondayOfWeek } from "./scorecard/utils";
 import type { KPISection } from "./scorecard/types";
 import { doc, onSnapshot, setDoc, getDoc, runTransaction } from "firebase/firestore";
 import { db } from "../firebase";
@@ -29,11 +29,54 @@ async function migrateScorecardFromLocalStorage() {
   localStorage.setItem("ninety-migrated-scorecard", "1");
 }
 
+// Consolidate any off-Monday week keys (created by old timezone bug) into
+// the correct Monday key. Monday-keyed values take precedence; off-day
+// values are only kept if the Monday slot is empty. Runs once globally.
+async function consolidateWeekKeys() {
+  if (localStorage.getItem("ninety-consolidated-week-keys-v1")) return;
+  try {
+    const snap = await getDoc(scorecardRef);
+    if (!snap.exists()) { localStorage.setItem("ninety-consolidated-week-keys-v1", "1"); return; }
+    const sections: KPISection[] = snap.data().sections ?? [];
+    let changed = false;
+    const cleaned = sections.map((section) => ({
+      ...section,
+      kpis: section.kpis.map((kpi) => {
+        const original = kpi.weeklyValues ?? {};
+        const consolidated: Record<string, number | null> = {};
+        // First pass: keep entries already on Monday keys
+        for (const [key, value] of Object.entries(original)) {
+          if (key === mondayOfWeek(key)) consolidated[key] = value;
+        }
+        // Second pass: rescue off-day entries when Monday slot is empty
+        for (const [key, value] of Object.entries(original)) {
+          const monday = mondayOfWeek(key);
+          if (key !== monday && !(monday in consolidated)) {
+            consolidated[monday] = value;
+          }
+        }
+        if (Object.keys(consolidated).length !== Object.keys(original).length) changed = true;
+        return { ...kpi, weeklyValues: consolidated };
+      }),
+    }));
+    if (changed) {
+      await setDoc(scorecardRef, JSON.parse(JSON.stringify({ sections: cleaned })));
+      console.log("Consolidated off-Monday week keys");
+    }
+  } catch (e) {
+    console.warn("Week-key consolidation failed", e);
+  }
+  localStorage.setItem("ninety-consolidated-week-keys-v1", "1");
+}
+
 export default function Scorecard() {
   const [sections, setSections] = useState<KPISection[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => { migrateScorecardFromLocalStorage(); }, []);
+  useEffect(() => {
+    migrateScorecardFromLocalStorage();
+    consolidateWeekKeys();
+  }, []);
 
   useEffect(() => {
     return onSnapshot(scorecardRef, (snap) => {

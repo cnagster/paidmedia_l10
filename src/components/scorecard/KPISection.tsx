@@ -1,7 +1,23 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import type { KPI, KPISection as KPISectionType, WeekRange, GoalOperator, ValueType } from "./types";
-import { formatValue, formatGoal, meetsGoal, getTrend, getAverage, evaluateFormula } from "./utils";
+import { formatValue, formatGoal, meetsGoal, getTrend, getAverage, evaluateFormula, mondayOfWeek } from "./utils";
+
+// Normalize a weeklyValues map so all keys are the Monday of their week.
+// If multiple keys collapse to the same Monday, prefer the one that was
+// already on Monday; otherwise, take the first non-null value found.
+function normalizeWeeklyValues(values: Record<string, number | null> | undefined): Record<string, number | null> {
+  if (!values) return {};
+  const out: Record<string, number | null> = {};
+  for (const [k, v] of Object.entries(values)) {
+    if (k === mondayOfWeek(k)) out[k] = v;
+  }
+  for (const [k, v] of Object.entries(values)) {
+    const monday = mondayOfWeek(k);
+    if (k !== monday && !(monday in out)) out[monday] = v;
+  }
+  return out;
+}
 import ContextMenu from "./ContextMenu";
 import CreateItemModal from "./CreateItemModal";
 import type { ItemType } from "./CreateItemModal";
@@ -145,15 +161,25 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
 
   function commitCell(kpiId: string, weekKey: string) {
     const kpi = section.kpis.find((k) => k.id === kpiId)!;
+    const monday = mondayOfWeek(weekKey);
     if (tempValue.trim() === "") {
-      // Clear the cell — remove the key so it's excluded from average
-      const next = { ...kpi.weeklyValues };
-      delete next[weekKey];
+      // Clear the cell — remove all keys that fall in this week
+      const next: Record<string, number | null> = {};
+      for (const [k, v] of Object.entries(kpi.weeklyValues ?? {})) {
+        if (mondayOfWeek(k) !== monday) next[k] = v;
+      }
       updateKPI(kpiId, { weeklyValues: next });
     } else {
       const num = parseFloat(tempValue.replace(/[$,%\s]/g, ""));
       if (!isNaN(num)) {
-        updateKPI(kpiId, { weeklyValues: { ...kpi.weeklyValues, [weekKey]: num } });
+        // Drop any off-day keys for this week so we always have a single
+        // Monday-keyed value going forward.
+        const next: Record<string, number | null> = {};
+        for (const [k, v] of Object.entries(kpi.weeklyValues ?? {})) {
+          if (mondayOfWeek(k) !== monday) next[k] = v;
+        }
+        next[monday] = num;
+        updateKPI(kpiId, { weeklyValues: next });
       }
     }
     setEditingCell(null);
@@ -161,8 +187,11 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
 
   function clearCell(kpiId: string, weekKey: string) {
     const kpi = section.kpis.find((k) => k.id === kpiId)!;
-    const next = { ...kpi.weeklyValues };
-    delete next[weekKey];
+    const monday = mondayOfWeek(weekKey);
+    const next: Record<string, number | null> = {};
+    for (const [k, v] of Object.entries(kpi.weeklyValues ?? {})) {
+      if (mondayOfWeek(k) !== monday) next[k] = v;
+    }
     updateKPI(kpiId, { weeklyValues: next });
     setEditingCell(null);
   }
@@ -293,10 +322,13 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
 
               <tbody>
                 {section.kpis.map((kpi) => {
+                  // Normalize stored values so off-Monday keys still display
+                  // under the correct Monday column.
+                  const normalizedKPI = { ...kpi, weeklyValues: normalizeWeeklyValues(kpi.weeklyValues) };
                   // For formula KPIs, compute values per week dynamically
                   const resolvedKPI = kpi.formula
                     ? {
-                        ...kpi,
+                        ...normalizedKPI,
                         weeklyValues: Object.fromEntries(
                           weeks.map((w) => {
                             const result = evaluateFormula(kpi.formula!, w.key, section.kpis);
@@ -304,7 +336,7 @@ export default function KPISection({ section, weeks, onUpdate, onDelete }: Props
                           })
                         ),
                       }
-                    : kpi;
+                    : normalizedKPI;
                   const trend = getTrend(resolvedKPI, weeks);
                   const avg = getAverage(resolvedKPI, weeks);
                   const ti = TREND_STYLE[trend];

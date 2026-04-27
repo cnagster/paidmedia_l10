@@ -1,5 +1,26 @@
 import type { GoalOperator, ValueType, WeekRange, KPI } from "./types";
 
+// Format a Date using its local components (not UTC). This avoids
+// timezone bugs where a local Monday can become a UTC Tuesday after
+// toISOString() conversion in negative-offset timezones.
+export function toLocalISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// Given any date string (YYYY-MM-DD), return the Monday of that week
+// as a YYYY-MM-DD string. Used to normalize legacy Sunday/Tuesday keys.
+export function mondayOfWeek(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const day = date.getDay();
+  const daysSinceMonday = day === 0 ? 6 : day - 1;
+  date.setDate(date.getDate() - daysSinceMonday);
+  return toLocalISODate(date);
+}
+
 export function generateWeeks(count: number): WeekRange[] {
   // Weeks are Mon–Sun. Find Monday of current week.
   const today = new Date();
@@ -15,7 +36,7 @@ export function generateWeeks(count: number): WeekRange[] {
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
     weeks.push({
-      key: monday.toISOString().slice(0, 10),
+      key: toLocalISODate(monday),
       label: `${fmtDate(monday)} - ${fmtDate(sunday)}`,
     });
   }
