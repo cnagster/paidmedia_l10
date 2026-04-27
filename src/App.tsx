@@ -8,6 +8,7 @@ import Issues from "./components/pages/Issues";
 import Headlines from "./components/pages/Headlines";
 import OKRs from "./components/pages/OKRs";
 import Login from "./components/Login";
+import StaleTabBanner from "./components/StaleTabBanner";
 
 type NavItem = "overview" | "scorecard" | "okrs" | "todos" | "issues" | "headlines";
 
@@ -39,6 +40,7 @@ export default function App() {
 
   return (
     <AppProvider username={username}>
+      <StaleTabBanner />
       <AppShell />
     </AppProvider>
   );
