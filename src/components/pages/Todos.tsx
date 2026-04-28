@@ -4,6 +4,7 @@ import type { TodoItem, User } from "../../context/AppContext";
 import CreateItemModal from "../scorecard/CreateItemModal";
 import Calendar from "../ui/Calendar";
 import UserPicker from "../ui/UserPicker";
+import TodoDetailsModal from "./TodoDetailsModal";
 
 function Avatar({ user, size = 30 }: { user: User; size?: number }) {
   return (
@@ -58,6 +59,7 @@ export default function Todos() {
   const [page,         setPage]         = useState(1);
   const [perPage,      setPerPage]      = useState(25);
   const [dueSortOrder, setDueSortOrder] = useState<"asc" | "desc" | null>(null);
+  const [detailsId,    setDetailsId]    = useState<string | null>(null);
 
   function parseDueMs(dueBy: string): number {
     if (!dueBy) return Infinity; // empty dates sort last
@@ -217,6 +219,7 @@ export default function Todos() {
               onUpdateDue={(dueBy) => updateTodo(todo.id, { dueBy })}
               onUpdateAssignees={(assignees) => updateTodo(todo.id, { assignees })}
               onUpdateTitle={(title) => updateTodo(todo.id, { title })}
+              onOpenDetails={() => setDetailsId(todo.id)}
             />
           ))
         )}
@@ -295,11 +298,24 @@ export default function Todos() {
           onClose={() => setShowModal(false)}
         />
       )}
+
+      {/* Details modal */}
+      {detailsId && (() => {
+        const todo = todos.find((t) => t.id === detailsId);
+        if (!todo) return null;
+        return (
+          <TodoDetailsModal
+            todo={todo}
+            onSave={(changes) => updateTodo(todo.id, changes)}
+            onClose={() => setDetailsId(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
 
-function TodoRow({ todo, allUsers, onToggle, onDelete, onUpdateDue, onUpdateAssignees, onUpdateTitle }: {
+function TodoRow({ todo, allUsers, onToggle, onDelete, onUpdateDue, onUpdateAssignees, onUpdateTitle, onOpenDetails }: {
   todo: TodoItem;
   allUsers: User[];
   onToggle: () => void;
@@ -307,6 +323,7 @@ function TodoRow({ todo, allUsers, onToggle, onDelete, onUpdateDue, onUpdateAssi
   onUpdateDue: (dueBy: string) => void;
   onUpdateAssignees: (assignees: User[]) => void;
   onUpdateTitle: (title: string) => void;
+  onOpenDetails: () => void;
 }) {
   const [showCal,     setShowCal]     = useState(false);
   const [showPicker,  setShowPicker]  = useState(false);
@@ -361,11 +378,13 @@ function TodoRow({ todo, allUsers, onToggle, onDelete, onUpdateDue, onUpdateAssi
           />
         ) : (
           <span
-            onDoubleClick={() => { setEditingTitle(true); setTitleVal(todo.title); }}
-            title="Double-click to edit"
-            style={{ fontSize: 14, color: todo.done ? "#aaa" : "#333", textDecoration: todo.done ? "line-through" : "none", paddingRight: 16, cursor: "default" }}
+            onClick={onOpenDetails}
+            onDoubleClick={(e) => { e.stopPropagation(); setEditingTitle(true); setTitleVal(todo.title); }}
+            title="Click to view details · Double-click to rename"
+            style={{ fontSize: 14, color: todo.done ? "#aaa" : "#333", textDecoration: todo.done ? "line-through" : "none", paddingRight: 16, cursor: "pointer" }}
           >
             {todo.title}
+            {todo.description && <span style={{ marginLeft: 6, color: "#aaa", fontSize: 11 }}>📝</span>}
           </span>
         )}
 
